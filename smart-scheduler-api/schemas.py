@@ -2,12 +2,16 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict, Any, Union
 from uuid import UUID
+from datetime import datetime
 
 # --- Khuôn cho User ---
 class UserCreate(BaseModel):
-    username: str
-    email: Optional[str] = None  # Dùng str để linh hoạt, sẽ validate khi lưu vào DB
-    password: str
+    full_name: str  # Họ và tên (bắt buộc)
+    username: str  # Tên đăng nhập (bắt buộc)
+    password: str  # Mật khẩu (bắt buộc)
+    confirm_password: str  # Xác nhận mật khẩu (bắt buộc)
+    email: Optional[str] = None  # Email (tùy chọn)
+    phone: Optional[str] = None  # Số điện thoại (tùy chọn)
     
     @field_validator('email', mode='before')
     @classmethod
@@ -15,6 +19,22 @@ class UserCreate(BaseModel):
         """Xử lý email rỗng - chuyển thành None"""
         if v == "" or v is None:
             return None
+        return v
+    
+    @field_validator('phone', mode='before')
+    @classmethod
+    def validate_phone(cls, v):
+        """Xử lý phone rỗng - chuyển thành None"""
+        if v == "" or v is None:
+            return None
+        return v
+    
+    @field_validator('confirm_password')
+    @classmethod
+    def validate_passwords_match(cls, v, info):
+        """Kiểm tra mật khẩu xác nhận khớp"""
+        if 'password' in info.data and v != info.data['password']:
+            raise ValueError('Mật khẩu xác nhận không khớp')
         return v
 
 # --- Khuôn cho Token (Login) ---
@@ -29,6 +49,21 @@ class TokenData(BaseModel):
 # --- Khuôn cho Chatbot ---
 class ChatInput(BaseModel):
     message: str
+    session_id: Optional[str] = None  # ID phiên chat (để nhóm các tin nhắn)
+
+class ChatMessage(BaseModel):
+    role: str  # "user" hoặc "assistant"
+    content: str
+    created_at: Optional[datetime] = None
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    messages: List[ChatMessage]
+    created_at: datetime
+
+class ChatSearchResponse(BaseModel):
+    total: int
+    sessions: List[ChatHistoryResponse]
 
 # --- Khuôn cho Môn học ---
 class SubjectInput(BaseModel):
@@ -42,6 +77,7 @@ class SubjectInput(BaseModel):
     end_date: str  # Ngày kết thúc học (format: "YYYY-MM-DD")
     priority: int = Field(default=5, ge=1, le=10)  # Độ ưu tiên (1-10, 10 là cao nhất)
     is_retake: Optional[bool] = False  # Đánh dấu môn học lại
+    preferred_days: Optional[List[str]] = Field(default=None)  # Ưu tiên ngày học (VD: ["T2", "T3"])
 
 # --- Khuôn cho Thông tin học tập ---
 class StudyInfo(BaseModel):
@@ -87,3 +123,39 @@ class CourseUploadResponse(BaseModel):
     inserted: int
     semester: Optional[str] = None
     sample: List[CourseBase] = Field(default_factory=list)
+
+# --- Khuôn cho User Response ---
+class UserResponse(BaseModel):
+    id: str
+    full_name: Optional[str] = None
+    username: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    is_admin: bool
+    created_at: Optional[datetime] = None
+
+class UserListResponse(BaseModel):
+    total: int
+    users: List[UserResponse]
+
+# --- Khuôn cho Quên mật khẩu ---
+class ForgotPasswordRequest(BaseModel):
+    identifier: str  # Email hoặc số điện thoại
+
+class VerifyOTPRequest(BaseModel):
+    identifier: str  # Email hoặc số điện thoại
+    otp_code: str  # Mã OTP
+
+class ResetPasswordRequest(BaseModel):
+    identifier: str  # Email hoặc số điện thoại
+    otp_code: str  # Mã OTP đã xác nhận
+    new_password: str  # Mật khẩu mới
+    confirm_password: str  # Xác nhận mật khẩu mới
+    
+    @field_validator('confirm_password')
+    @classmethod
+    def validate_passwords_match(cls, v, info):
+        """Kiểm tra mật khẩu xác nhận khớp"""
+        if 'new_password' in info.data and v != info.data['new_password']:
+            raise ValueError('Mật khẩu xác nhận không khớp')
+        return v

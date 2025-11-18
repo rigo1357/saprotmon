@@ -97,11 +97,28 @@ class ScheduleGA:
                 if 'T7' in slot_name:
                     penalty += 300  # Phạt nếu xếp thứ 7 khi không cho phép
 
-        # Ràng buộc 7: Ưu tiên môn học lại (nếu không được xếp slot, phạt nặng)
-        # (được xử lý gián tiếp qua priority; ở đây bổ sung phạt nếu bị đẩy vào Tối khi không phải retake)
+        # Ràng buộc 7: Phạt khi xếp vào unavailable slots (ngày không rảnh)
+        available_slots = self.additional_constraints.get('available_slots', [])
+        unavailable_slots = self.additional_constraints.get('unavailable_slots', [])
+        
         for i, slot_index in enumerate(individual):
             subject_name = self.subjects[i]
             slot_name = self.time_slots[slot_index]
+            
+            # Phạt nặng nếu xếp vào unavailable slot (nhưng vẫn cho phép)
+            if slot_name in unavailable_slots:
+                priority = self.priorities.get(subject_name, 5)
+                # Phạt ít hơn nếu priority cao (cho phép môn quan trọng vào ngày không rảnh)
+                penalty += 800 - (priority - 5) * 50
+            
+            # Thưởng khi xếp vào preferred_days
+            preferred_days = self.subject_details.get(subject_name, {}).get("preferred_days", [])
+            if preferred_days:
+                day = slot_name.split('_')[0]
+                if day in preferred_days:
+                    # Thưởng (giảm penalty) khi xếp đúng ngày ưu tiên
+                    penalty -= 150
+            
             is_retake = self.subject_details.get(subject_name, {}).get("is_retake", False)
             if not is_retake and "Tối" in slot_name:
                 penalty += 80  # Giảm xếp lớp thường vào buổi tối

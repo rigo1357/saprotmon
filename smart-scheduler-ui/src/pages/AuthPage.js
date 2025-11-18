@@ -1,7 +1,10 @@
 // src/pages/AuthPage.js
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import './AuthPage.css';
 
 const features = [
   { title: 'Tạo lịch thông minh', description: 'Ưu tiên môn quan trọng, cân bằng thời khóa biểu của bạn.' },
@@ -13,15 +16,26 @@ const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'Admin@123';
 
 function AuthPage() {
-  const [mode, setMode] = useState('login'); // login | register
+  const [mode, setMode] = useState('login'); // login | register | forgot-password
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authMessage, setAuthMessage] = useState('');
+  
+  // State cho quên mật khẩu
+  const [forgotStep, setForgotStep] = useState(1); // 1: nhập email/phone, 2: nhập OTP, 3: đặt lại mật khẩu
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   const { login } = useAuth();
 
@@ -30,6 +44,15 @@ function AuthPage() {
     setAuthMessage('');
     setPassword('');
     setConfirmPassword('');
+    setFullName('');
+    setEmail('');
+    setPhone('');
+    // Reset forgot password state
+    setForgotStep(1);
+    setForgotIdentifier('');
+    setOtpCode('');
+    setNewPassword('');
+    setConfirmNewPassword('');
   };
 
   const fillAdminCredentials = () => {
@@ -55,6 +78,15 @@ function AuthPage() {
     e.preventDefault();
     setAuthMessage('');
 
+    // Validation
+    if (!fullName.trim()) {
+      setAuthMessage('Vui lòng nhập Họ và Tên.');
+      return;
+    }
+    if (!username.trim()) {
+      setAuthMessage('Vui lòng nhập Tên đăng nhập.');
+      return;
+    }
     if (password.length < 6) {
       setAuthMessage('Mật khẩu cần tối thiểu 6 ký tự.');
       return;
@@ -67,18 +99,26 @@ function AuthPage() {
     setIsSubmitting(true);
     try {
       const payload = {
+        full_name: fullName.trim(),
         username: username.trim(),
         password,
+        confirm_password: confirmPassword,
         email: email.trim() || null,
+        phone: phone.trim() || null,
       };
       const response = await api.post('/api/register', payload);
       if (response.status === 201) {
-        setAuthMessage('🎉 Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
-        switchMode('login');
-        setUsername('');
-        setPassword('');
-        setConfirmPassword('');
-        setEmail('');
+        setAuthMessage('🎉 Đăng ký thành công! Vui lòng đăng nhập.');
+        // Tự động quay lại login sau 1.5 giây
+        setTimeout(() => {
+          switchMode('login');
+          setUsername('');
+          setPassword('');
+          setConfirmPassword('');
+          setFullName('');
+          setEmail('');
+          setPhone('');
+        }, 1500);
       }
     } catch (error) {
       console.error('Lỗi đăng ký:', error);
@@ -97,6 +137,95 @@ function AuthPage() {
     }
   };
 
+  // Quên mật khẩu - Bước 1: Gửi OTP
+  const handleForgotPasswordRequest = async (e) => {
+    e.preventDefault();
+    setAuthMessage('');
+    
+    if (!forgotIdentifier.trim()) {
+      setAuthMessage('Vui lòng nhập email hoặc số điện thoại.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await api.post('/api/forgot-password/request', {
+        identifier: forgotIdentifier.trim()
+      });
+      setAuthMessage(response.data.message || 'Mã OTP đã được gửi. Vui lòng kiểm tra email/số điện thoại.');
+      setForgotStep(2);
+    } catch (error) {
+      console.error('Lỗi gửi OTP:', error);
+      const detail = error.response?.data?.detail || error.message || 'Có lỗi khi gửi mã OTP.';
+      setAuthMessage(detail);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Quên mật khẩu - Bước 2: Xác nhận OTP
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setAuthMessage('');
+    
+    if (!otpCode.trim() || otpCode.length !== 6) {
+      setAuthMessage('Vui lòng nhập mã OTP 6 chữ số.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await api.post('/api/forgot-password/verify', {
+        identifier: forgotIdentifier.trim(),
+        otp_code: otpCode.trim()
+      });
+      setAuthMessage(response.data.message || 'Mã OTP hợp lệ. Vui lòng đặt lại mật khẩu.');
+      setForgotStep(3);
+    } catch (error) {
+      console.error('Lỗi xác nhận OTP:', error);
+      const detail = error.response?.data?.detail || error.message || 'Mã OTP không hợp lệ.';
+      setAuthMessage(detail);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Quên mật khẩu - Bước 3: Đặt lại mật khẩu
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setAuthMessage('');
+    
+    if (newPassword.length < 6) {
+      setAuthMessage('Mật khẩu cần tối thiểu 6 ký tự.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setAuthMessage('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await api.post('/api/forgot-password/reset', {
+        identifier: forgotIdentifier.trim(),
+        otp_code: otpCode.trim(),
+        new_password: newPassword,
+        confirm_password: confirmNewPassword
+      });
+      setAuthMessage('✅ ' + (response.data.message || 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.'));
+      // Quay lại login sau 2 giây
+      setTimeout(() => {
+        switchMode('login');
+      }, 2000);
+    } catch (error) {
+      console.error('Lỗi đặt lại mật khẩu:', error);
+      const detail = error.response?.data?.detail || error.message || 'Có lỗi khi đặt lại mật khẩu.';
+      setAuthMessage(detail);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderInput = ({
     label,
     type = 'text',
@@ -106,24 +235,16 @@ function AuthPage() {
     required,
     addon,
   }) => (
-    <div style={{ marginBottom: '14px' }}>
-      <label style={{ display: 'block', color: '#94a3b8', marginBottom: '6px', fontSize: '14px' }}>{label}</label>
-      <div style={{ position: 'relative' }}>
+    <div className="auth-form-group">
+      <label className="auth-form-label">{label}</label>
+      <div className="auth-password-wrapper">
         <input
           type={type}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
           required={required}
-          style={{
-            width: '100%',
-            padding: '12px 14px',
-            borderRadius: '14px',
-            border: '1px solid rgba(148,163,184,0.4)',
-            backgroundColor: 'rgba(15,23,42,0.6)',
-            color: '#e2e8f0',
-            fontSize: '15px',
-          }}
+          className="auth-form-input"
         />
         {addon}
       </div>
@@ -131,129 +252,123 @@ function AuthPage() {
   );
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'radial-gradient(circle at top,#0ea5e9,#0f172a 55%,#020617)',
-        padding: '40px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '1100px',
-          background: 'rgba(15,23,42,0.9)',
-          borderRadius: '32px',
-          padding: '40px',
-          boxShadow: '0 40px 80px rgba(2,6,23,0.8)',
-          border: '1px solid rgba(148,163,184,0.2)',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '40px',
-        }}
+    <div className="auth-page-container">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="auth-container"
       >
-        <div style={{ color: '#e2e8f0' }}>
-          <h1 style={{ fontSize: '36px', marginBottom: '10px' }}>Smart Scheduler</h1>
-          <p style={{ color: '#94a3b8', marginBottom: '30px' }}>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="auth-left-panel"
+        >
+          <h1 className="auth-welcome-title">🎓 Smart Scheduler</h1>
+          <p className="auth-welcome-subtitle">
             Tối ưu thời khóa biểu, tiết kiệm thời gian đăng ký học phần với trợ lý thông minh.
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '30px' }}>
-            {features.map((feature) => (
-              <div key={feature.title} style={{ background: 'rgba(2,6,23,0.6)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(148,163,184,0.15)' }}>
-                <h4 style={{ margin: 0 }}>{feature.title}</h4>
-                <p style={{ margin: '6px 0 0', color: '#94a3b8' }}>{feature.description}</p>
-              </div>
+          <ul className="auth-features-list">
+            {features.map((feature, index) => (
+              <motion.li
+                key={feature.title}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
+                className="auth-feature-item"
+              >
+                <span className="auth-feature-icon">
+                  {index === 0 ? '📅' : index === 1 ? '📚' : '💬'}
+                </span>
+                <div className="auth-feature-content">
+                  <h4>{feature.title}</h4>
+                  <p>{feature.description}</p>
+                </div>
+              </motion.li>
             ))}
-          </div>
-          <div style={{ background: 'rgba(15,118,110,0.2)', border: '1px solid rgba(45,212,191,0.4)', borderRadius: '18px', padding: '18px' }}>
-            <h4 style={{ marginTop: 0, color: '#34d399' }}>Tài khoản quản trị mặc định</h4>
-            <p style={{ margin: '6px 0', color: '#a7f3d0' }}>
+          </ul>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            className="auth-admin-hint"
+          >
+            <h4 style={{ marginTop: 0, marginBottom: '10px' }}>🔑 Tài khoản quản trị mặc định</h4>
+            <p style={{ margin: '6px 0', fontSize: '0.95rem' }}>
               Username: <strong>{ADMIN_USERNAME}</strong> – Password: <strong>{ADMIN_PASSWORD}</strong>
             </p>
             <button
               type="button"
               onClick={fillAdminCredentials}
-              style={{
-                marginTop: '10px',
-                padding: '10px 18px',
-                borderRadius: '999px',
-                border: 'none',
-                background: 'linear-gradient(135deg,#34d399,#10b981)',
-                color: '#0f172a',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-              }}
+              className="auth-admin-button"
             >
               Điền thông tin admin
             </button>
-          </div>
-        </div>
+          </motion.div>
+          <Link to="/" className="auth-back-link">
+            ← Về trang chủ
+          </Link>
+        </motion.div>
 
-        <div
-          style={{
-            background: 'rgba(2,6,23,0.7)',
-            borderRadius: '26px',
-            padding: '32px',
-            border: '1px solid rgba(148,163,184,0.25)',
-            boxShadow: 'inset 0 0 35px rgba(8,47,73,0.45)',
-          }}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="auth-right-panel"
         >
-          <div style={{ display: 'flex', marginBottom: '24px', background: 'rgba(15,23,42,0.8)', borderRadius: '999px', padding: '6px' }}>
+          <div className="auth-tabs">
             <button
               type="button"
               onClick={() => switchMode('login')}
-              style={{
-                flex: 1,
-                border: 'none',
-                borderRadius: '999px',
-                padding: '10px 0',
-                background: mode === 'login' ? 'linear-gradient(135deg,#38bdf8,#22d3ee)' : 'transparent',
-                color: mode === 'login' ? '#0f172a' : '#94a3b8',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-              }}
+              className={`auth-tab ${mode === 'login' ? 'active' : ''}`}
             >
               Đăng nhập
             </button>
             <button
               type="button"
               onClick={() => switchMode('register')}
-              style={{
-                flex: 1,
-                border: 'none',
-                borderRadius: '999px',
-                padding: '10px 0',
-                background: mode === 'register' ? 'linear-gradient(135deg,#f472b6,#fb7185)' : 'transparent',
-                color: mode === 'register' ? '#0f172a' : '#94a3b8',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-              }}
+              className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
             >
               Đăng ký
             </button>
           </div>
+          
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => switchMode('forgot-password')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#667eea',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                marginTop: '10px',
+                textDecoration: 'underline',
+                padding: '5px 0'
+              }}
+            >
+              Quên mật khẩu?
+            </button>
+          )}
 
           {authMessage && (
             <div
-              style={{
-                marginBottom: '18px',
-                padding: '12px',
-                borderRadius: '14px',
-                backgroundColor: authMessage.includes('thành công') ? 'rgba(16,185,129,0.2)' : 'rgba(248,113,113,0.15)',
-                color: authMessage.includes('thành công') ? '#bbf7d0' : '#fecaca',
-                border: authMessage.includes('thành công') ? '1px solid rgba(74,222,128,0.4)' : '1px solid rgba(248,113,113,0.3)',
-                whiteSpace: 'pre-line',
-              }}
+              className={`auth-message ${
+                authMessage.includes('thành công') || authMessage.includes('🎉')
+                  ? 'success'
+                  : authMessage.includes('⚠️') || authMessage.includes('thông tin')
+                  ? 'info'
+                  : 'error'
+              }`}
             >
               {authMessage}
             </div>
           )}
 
           {mode === 'login' ? (
-            <form onSubmit={handleLogin}>
+            <form onSubmit={handleLogin} className="auth-form">
               {renderInput({
                 label: 'Tên đăng nhập',
                 type: 'text',
@@ -273,44 +388,34 @@ function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    style={{
-                      position: 'absolute',
-                      right: '16px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                    }}
+                    className="auth-password-toggle"
                   >
-                    {showPassword ? 'Ẩn' : 'Hiện'}
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
                   </button>
                 ),
               })}
-              <button
+              <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '999px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg,#38bdf8,#22d3ee)',
-                  color: '#0f172a',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  marginTop: '10px',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="auth-submit-button"
               >
                 {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
-              </button>
+              </motion.button>
             </form>
-          ) : (
-            <form onSubmit={handleRegister}>
+          ) : mode === 'register' ? (
+            <form onSubmit={handleRegister} className="auth-form">
               {renderInput({
-                label: 'Tên đăng nhập',
+                label: 'Họ và Tên *',
+                type: 'text',
+                placeholder: 'Nhập họ và tên đầy đủ',
+                value: fullName,
+                onChange: (e) => setFullName(e.target.value),
+                required: true,
+              })}
+              {renderInput({
+                label: 'Tên đăng nhập *',
                 type: 'text',
                 placeholder: 'ví dụ: sinhvien123',
                 value: username,
@@ -318,16 +423,9 @@ function AuthPage() {
                 required: true,
               })}
               {renderInput({
-                label: 'Email (tuỳ chọn)',
-                type: 'email',
-                placeholder: 'name@student.edu.vn',
-                value: email,
-                onChange: (e) => setEmail(e.target.value),
-              })}
-              {renderInput({
-                label: 'Mật khẩu',
+                label: 'Mật khẩu *',
                 type: showPassword ? 'text' : 'password',
-                placeholder: '••••••••',
+                placeholder: 'Tối thiểu 6 ký tự',
                 value: password,
                 onChange: (e) => setPassword(e.target.value),
                 required: true,
@@ -335,23 +433,14 @@ function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    style={{
-                      position: 'absolute',
-                      right: '16px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                    }}
+                    className="auth-password-toggle"
                   >
-                    {showPassword ? 'Ẩn' : 'Hiện'}
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
                   </button>
                 ),
               })}
               {renderInput({
-                label: 'Xác nhận mật khẩu',
+                label: 'Xác nhận mật khẩu *',
                 type: showConfirmPassword ? 'text' : 'password',
                 placeholder: 'Nhập lại mật khẩu',
                 value: confirmPassword,
@@ -361,43 +450,188 @@ function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    style={{
-                      position: 'absolute',
-                      right: '16px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                    }}
+                    className="auth-password-toggle"
                   >
-                    {showConfirmPassword ? 'Ẩn' : 'Hiện'}
+                    {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
                   </button>
                 ),
               })}
-              <button
+              {renderInput({
+                label: 'Email (tùy chọn)',
+                type: 'email',
+                placeholder: 'name@student.edu.vn',
+                value: email,
+                onChange: (e) => setEmail(e.target.value),
+              })}
+              {renderInput({
+                label: 'Số điện thoại (tùy chọn)',
+                type: 'tel',
+                placeholder: '0123456789',
+                value: phone,
+                onChange: (e) => setPhone(e.target.value),
+              })}
+              <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '999px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg,#f472b6,#fb7185)',
-                  color: '#0f172a',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  marginTop: '10px',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="auth-submit-button"
               >
                 {isSubmitting ? 'Đang đăng ký...' : 'Tạo tài khoản'}
-              </button>
+              </motion.button>
             </form>
+          ) : (
+            // Form quên mật khẩu
+            <div className="auth-form">
+              {forgotStep === 1 && (
+                <form onSubmit={handleForgotPasswordRequest}>
+                  <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#1e293b' }}>
+                    Quên mật khẩu
+                  </h3>
+                  <p style={{ marginBottom: '20px', color: '#64748b', fontSize: '0.95rem' }}>
+                    Nhập email hoặc số điện thoại đã đăng ký để nhận mã OTP.
+                  </p>
+                  {renderInput({
+                    label: 'Email hoặc Số điện thoại',
+                    type: 'text',
+                    placeholder: 'email@example.com hoặc 0123456789',
+                    value: forgotIdentifier,
+                    onChange: (e) => setForgotIdentifier(e.target.value),
+                    required: true,
+                  })}
+                  <motion.button
+                    type="submit"
+                    disabled={isSubmitting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="auth-submit-button"
+                  >
+                    {isSubmitting ? 'Đang gửi...' : 'Gửi mã OTP'}
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={() => switchMode('login')}
+                    style={{
+                      width: '100%',
+                      marginTop: '10px',
+                      padding: '12px',
+                      background: 'transparent',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Quay lại đăng nhập
+                  </button>
+                </form>
+              )}
+              
+              {forgotStep === 2 && (
+                <form onSubmit={handleVerifyOTP}>
+                  <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#1e293b' }}>
+                    Nhập mã OTP
+                  </h3>
+                  <p style={{ marginBottom: '20px', color: '#64748b', fontSize: '0.95rem' }}>
+                    Mã OTP đã được gửi đến <strong>{forgotIdentifier}</strong>. Vui lòng kiểm tra và nhập mã 6 chữ số.
+                  </p>
+                  {renderInput({
+                    label: 'Mã OTP',
+                    type: 'text',
+                    placeholder: '123456',
+                    value: otpCode,
+                    onChange: (e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)),
+                    required: true,
+                  })}
+                  <motion.button
+                    type="submit"
+                    disabled={isSubmitting || otpCode.length !== 6}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="auth-submit-button"
+                  >
+                    {isSubmitting ? 'Đang xác nhận...' : 'Xác nhận OTP'}
+                  </motion.button>
+                  <button
+                    type="button"
+                    onClick={() => setForgotStep(1)}
+                    style={{
+                      width: '100%',
+                      marginTop: '10px',
+                      padding: '12px',
+                      background: 'transparent',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '12px',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Gửi lại mã OTP
+                  </button>
+                </form>
+              )}
+              
+              {forgotStep === 3 && (
+                <form onSubmit={handleResetPassword}>
+                  <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#1e293b' }}>
+                    Đặt lại mật khẩu
+                  </h3>
+                  <p style={{ marginBottom: '20px', color: '#64748b', fontSize: '0.95rem' }}>
+                    Nhập mật khẩu mới của bạn.
+                  </p>
+                  {renderInput({
+                    label: 'Mật khẩu mới',
+                    type: showNewPassword ? 'text' : 'password',
+                    placeholder: 'Tối thiểu 6 ký tự',
+                    value: newPassword,
+                    onChange: (e) => setNewPassword(e.target.value),
+                    required: true,
+                    addon: (
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword((prev) => !prev)}
+                        className="auth-password-toggle"
+                      >
+                        {showNewPassword ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    ),
+                  })}
+                  {renderInput({
+                    label: 'Xác nhận mật khẩu mới',
+                    type: showConfirmNewPassword ? 'text' : 'password',
+                    placeholder: 'Nhập lại mật khẩu mới',
+                    value: confirmNewPassword,
+                    onChange: (e) => setConfirmNewPassword(e.target.value),
+                    required: true,
+                    addon: (
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmNewPassword((prev) => !prev)}
+                        className="auth-password-toggle"
+                      >
+                        {showConfirmNewPassword ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    ),
+                  })}
+                  <motion.button
+                    type="submit"
+                    disabled={isSubmitting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="auth-submit-button"
+                  >
+                    {isSubmitting ? 'Đang đặt lại...' : 'Đặt lại mật khẩu'}
+                  </motion.button>
+                </form>
+              )}
+            </div>
           )}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

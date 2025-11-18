@@ -1,0 +1,90 @@
+@startuml Smart_Scheduler_General
+!theme plain
+skinparam actorStyle awesome
+skinparam useCaseStyle rectangle
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+title Smart Scheduler System – General Use Case Diagram
+
+' ===============================
+'  ACTORS
+' ===============================
+actor Student as S
+actor Admin as A
+actor System as Sys
+
+' ===============================
+'  MAIN USE CASE
+' ===============================
+usecase UC0 as "UC-000: Smart Scheduler System"
+
+' ===============================
+'  ACCOUNT MANAGEMENT
+' ===============================
+usecase UC001 as "Đăng ký tài khoản"
+usecase UC002 as "Đăng nhập"
+usecase UC003 as "Đăng xuất"
+
+' ===============================
+'  COURSE MANAGEMENT
+' ===============================
+usecase UC004 as "Quản lý môn học"
+
+' ===============================
+'  SCHEDULING
+' ===============================
+usecase UC005 as "Chọn môn học"
+usecase UC006 as "Thiết lập thời gian rảnh"
+usecase UC007 as "Thiết lập ràng buộc"
+usecase UC008 as "Tạo thời khóa biểu (GA)"
+usecase UC009 as "Xem thời khóa biểu"
+usecase UC010 as "Xuất thời khóa biểu"
+
+' ===============================
+'  CHATBOT
+' ===============================
+usecase UC011 as "Chat với AI"
+
+' ===============================
+'  ACTOR ASSOCIATIONS
+' ===============================
+S --> UC001
+S --> UC002
+S --> UC003
+S --> UC005
+S --> UC006
+S --> UC007
+S --> UC008
+S --> UC009
+S --> UC010
+S --> UC011
+
+A --> UC001
+A --> UC002
+A --> UC003
+A --> UC004
+
+Sys --> UC008
+
+' ===============================
+'  RELATIONSHIPS WITH MAIN UC
+' ===============================
+UC001 ..|> UC0
+UC002 ..|> UC0
+UC003 ..|> UC0
+UC004 ..|> UC0
+UC005 ..|> UC0
+UC006 ..|> UC0
+UC007 ..|> UC0
+UC008 ..|> UC0
+UC009 ..|> UC0
+UC010 ..|> UC0
+UC011 ..|> UC0
+
+' Conflict handling – included by scheduling
+UC008 ..> UC005 : <<include>>
+UC008 ..> UC006 : <<include>>
+UC008 ..> UC007 : <<include>>
+
+@enduml

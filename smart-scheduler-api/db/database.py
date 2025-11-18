@@ -5,7 +5,7 @@ from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
-from .models import User, Schedule, Course  # Đảm bảo import cả User, Schedule, Course
+from .models import User, Schedule, Course, ChatHistory, OTP  # Đảm bảo import cả User, Schedule, Course, ChatHistory, OTP
 
 # Global client để tái sử dụng
 _client = None
@@ -75,7 +75,9 @@ async def init_db():
             document_models=[
                 User,
                 Schedule,
-                Course
+                Course,
+                ChatHistory,
+                OTP
             ]
         )
         print("✓ Khởi tạo Beanie hoàn tất.")

@@ -1,0 +1,553 @@
+/* src/pages/SchedulerPage.css */
+
+/* --- Layout chung --- */
+.scheduler-page-container {
+  min-height: 100vh;
+  padding: 30px;
+  background: radial-gradient(circle at top, #1e3a8a, #0f172a, #020617);
+  font-family: 'Inter', sans-serif;
+}
+
+.scheduler-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 25px 35px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.header-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-subtitle {
+  margin: 8px 0 0 0;
+  color: #64748b;
+  font-size: 1rem;
+}
+
+/* --- Các nút bấm (Buttons) --- */
+.btn-rounded {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-pink {
+  background: linear-gradient(135deg, #f472b6, #ec4899);
+  color: #ffffff;
+}
+
+.btn-pink:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(244, 114, 182, 0.4);
+}
+
+.btn-cyan {
+  background: linear-gradient(135deg, #22d3ee, #06b6d4);
+  color: #ffffff;
+}
+
+.btn-cyan:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.4);
+}
+
+.btn-primary-gradient {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #0f172a;
+  padding: 16px 40px;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  box-shadow: 0 20px 40px rgba(16, 185, 129, 0.35);
+}
+
+.btn-disabled {
+  background: #475569 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  color: #94a3b8 !important;
+}
+
+/* --- Form chính --- */
+.scheduler-main-card {
+  padding: 30px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.95));
+  color: #e2e8f0;
+  box-shadow: 0 40px 80px rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* --- Inputs --- */
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  margin-top: 5px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background-color: rgba(2, 6, 23, 0.8);
+  color: #e2e8f0;
+  box-sizing: border-box; /* Quan trọng để không vỡ layout */
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #22d3ee;
+}
+
+.input-readonly {
+  background-color: rgba(15, 23, 42, 0.4);
+}
+
+/* --- Cards thời gian rảnh --- */
+.time-card {
+  padding: 15px;
+  border-radius: 16px;
+  background-color: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.time-card h4 {
+  margin: 0;
+  color: #22d3ee;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+/* --- Chọn môn học --- */
+.tab-button {
+  padding: 10px 25px;
+  border-radius: 999px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.tab-button.active {
+  background: #f472b6;
+  color: #0f172a;
+  box-shadow: 0 10px 25px rgba(236, 72, 153, 0.35);
+}
+
+.tab-button.inactive {
+  background: rgba(15, 23, 42, 0.6);
+  color: #0f172a;
+}
+
+.subject-list-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  padding: 10px;
+}
+
+.subject-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.subject-item.selected {
+  background-color: rgba(59, 130, 246, 0.25);
+}
+
+.subject-item.default {
+  background-color: rgba(15, 23, 42, 0.6);
+}
+
+/* --- Nút ưu tiên --- */
+.priority-btn {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.priority-btn.up {
+  background-color: #34d399;
+  color: #0f172a;
+}
+
+.priority-btn.down {
+  background-color: #fb7185;
+  color: #0f172a;
+}
+
+.priority-btn:disabled {
+  background-color: #475569;
+  cursor: not-allowed;
+}
+
+/* --- Constraint Toggle --- */
+.constraint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background-color: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  cursor: pointer;
+}
+
+/* --- Bảng kết quả --- */
+.schedule-result-container {
+  margin-top: 30px;
+  padding: 20px;
+  border-radius: 24px;
+  background-color: rgba(2, 6, 23, 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: rgba(15, 23, 42, 0.95);
+  color: #e2e8f0;
+}
+
+.schedule-th {
+  padding: 12px;
+  background-color: #0f172a;
+  border-bottom: 2px solid #22d3ee;
+  position: sticky;
+  top: 0;
+}
+
+.schedule-td {
+  padding: 12px;
+  min-width: 150px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  vertical-align: top;
+}
+
+.session-label {
+  padding: 12px;
+  background-color: rgba(15, 23, 42, 0.8);
+  font-weight: bold;
+  border-right: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* --- Page Tabs --- */
+.page-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 0;
+}
+
+.page-tab {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  margin-bottom: -2px;
+}
+
+.page-tab:hover {
+  color: #e2e8f0;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.page-tab.active {
+  color: #22d3ee;
+  border-bottom-color: #22d3ee;
+  background: rgba(34, 211, 238, 0.1);
+}
+
+/* --- Chatbot Page --- */
+.chatbot-page-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.chatbot-main-card {
+  width: 100%;
+  max-width: 900px;
+  height: calc(100vh - 250px);
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.95));
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 40px 80px rgba(2, 6, 23, 0.6);
+  overflow: hidden;
+}
+
+.chatbot-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.chatbot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chatbot-message {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-message {
+  flex-direction: row-reverse;
+}
+
+.message-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: rgba(34, 211, 238, 0.2);
+}
+
+.user-message .message-avatar {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.message-content {
+  flex: 1;
+  max-width: 70%;
+}
+
+.user-message .message-content {
+  text-align: right;
+}
+
+.message-text {
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.user-message .message-text {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.3));
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.bot-message .message-text {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
+.typing-indicator {
+  display: inline-block;
+}
+
+.typing-indicator::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+.chatbot-input-container {
+  padding: 20px 24px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.chatbot-input {
+  flex: 1;
+  padding: 12px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(2, 6, 23, 0.8);
+  color: #e2e8f0;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.chatbot-input:focus {
+  border-color: #22d3ee;
+}
+
+.chatbot-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chatbot-send-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #38bdf8, #22d3ee);
+  color: #0f172a;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+}
+
+.chatbot-send-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 10px 20px rgba(34, 211, 238, 0.4);
+}
+
+.chatbot-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Chatbot Sidebar --- */
+.chatbot-sidebar {
+  width: 0;
+  min-width: 0;
+  max-width: 300px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.95));
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatbot-sidebar.open {
+  width: 300px;
+  min-width: 300px;
+}
+
+.sidebar-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.sidebar-toggle {
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.sidebar-search {
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  transition: background 0.2s;
+}
+
+.history-item:hover {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.history-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-btn {
+  padding: 4px 8px;
+  font-size: 16px;
+}
+
+/* --- Scrollbar tùy chỉnh --- */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
