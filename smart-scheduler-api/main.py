@@ -739,6 +739,76 @@ async def handle_schedule(
                 base += 2
             return min(10, base)
 
+        def normalize_day_token(raw_value: str) -> Optional[str]:
+            if not raw_value:
+                return None
+            token = str(raw_value).strip().upper()
+            # Chuẩn hoá định dạng thường gặp
+            token = token.replace("THỨ", "T")
+            token = token.replace("THU", "T")
+            token = token.replace(".", "")
+            token = token.replace(" ", "")
+            alias_map = {
+                "T2": "T2",
+                "T3": "T3",
+                "T4": "T4",
+                "T5": "T5",
+                "T6": "T6",
+                "T7": "T7",
+                "CN": "CN",
+                "TH2": "T2",
+                "TH3": "T3",
+                "TH4": "T4",
+                "TH5": "T5",
+                "TH6": "T6",
+                "TH7": "T7",
+                "MON": "T2",
+                "MONDAY": "T2",
+                "TUE": "T3",
+                "TUESDAY": "T3",
+                "WED": "T4",
+                "WEDNESDAY": "T4",
+                "THU": "T5",
+                "THURSDAY": "T5",
+                "FRI": "T6",
+                "FRIDAY": "T6",
+                "SAT": "T7",
+                "SATURDAY": "T7",
+                "SUN": "CN",
+                "SUNDAY": "CN",
+                "CHUNHAT": "CN",
+                "CHUNHẬT": "CN",
+            }
+            if token in alias_map:
+                return alias_map[token]
+            digit_match = re.search(r"([2-7])", token)
+            if digit_match:
+                return f"T{digit_match.group(1)}"
+            if "CN" in token:
+                return "CN"
+            return None
+
+        def normalize_days(day_value: Any) -> Optional[List[str]]:
+            if day_value is None:
+                return None
+            if isinstance(day_value, (list, tuple, set)):
+                raw_items = list(day_value)
+            else:
+                raw_items = re.split(r"[,&/|;]+", str(day_value)) if isinstance(day_value, str) else [day_value]
+            normalized: List[str] = []
+            for item in raw_items:
+                normalized_token = normalize_day_token(item)
+                if normalized_token and normalized_token not in normalized:
+                    normalized.append(normalized_token)
+            return normalized or None
+
+        def has_day_overlap(entry_a: dict, entry_b: dict) -> bool:
+            days_a = entry_a.get("days")
+            days_b = entry_b.get("days")
+            if days_a and days_b:
+                return bool(set(days_a) & set(days_b))
+            return True
+
         entries = []
         for index, subject in enumerate(input.subjects):
             try:
@@ -751,6 +821,7 @@ async def handle_schedule(
                 "priority": calc_priority(subject),
                 "start": start_date,
                 "end": end_date,
+                "days": normalize_days(getattr(subject, "day", None)),
                 "original_index": index,
             })
 
@@ -763,8 +834,10 @@ async def handle_schedule(
                 for j in range(i + 1, len(items)):
                     a = items[i]
                     b = items[j]
-                    # Kiểm tra trùng khoảng thời gian
+                    # Kiểm tra trùng khoảng thời gian (ngày)
                     if b["start"] <= a["start"] <= b["end"] or a["start"] <= b["start"] <= a["end"]:
+                        if not has_day_overlap(a, b):
+                            continue
                         # Kiểm tra trùng giờ học
                         a_start_time = a["data"].start_time
                         a_end_time = a["data"].end_time
@@ -805,6 +878,7 @@ async def handle_schedule(
                         self.end_time = metadata.get("end_time", "11:30")
                         self.start_date = metadata.get("start_date")
                         self.end_date = metadata.get("end_date")
+                        self.day = metadata.get("day")
                         self.credits = course_data.credits
                         self.instructor = course_data.department or ""
                         self.subject_type = "Lý thuyết"
@@ -818,6 +892,7 @@ async def handle_schedule(
                     "priority": remove_entry_ref["priority"],  # Giữ nguyên priority
                     "start": alt_start_date,
                     "end": alt_end_date,
+                    "days": normalize_days(getattr(alt_subject, "day", None)),
                     "original_index": remove_entry_ref["original_index"],  # Giữ nguyên index
                 }
                 
@@ -825,13 +900,16 @@ async def handle_schedule(
                 conflict_with_keep = False
                 if (conflicting_with["start"] <= alt_start_date <= conflicting_with["end"] or 
                     alt_start_date <= conflicting_with["start"] <= alt_end_date):
-                    # Kiểm tra trùng giờ học
-                    keep_start_time = conflicting_with["data"].start_time
-                    keep_end_time = conflicting_with["data"].end_time
-                    alt_start_time = alt_subject.start_time
-                    alt_end_time = alt_subject.end_time
-                    if (alt_start_time < keep_end_time and alt_end_time > keep_start_time):
-                        conflict_with_keep = True
+                    if not has_day_overlap(alt_entry, conflicting_with):
+                        conflict_with_keep = False
+                    else:
+                        # Kiểm tra trùng giờ học
+                        keep_start_time = conflicting_with["data"].start_time
+                        keep_end_time = conflicting_with["data"].end_time
+                        alt_start_time = alt_subject.start_time
+                        alt_end_time = alt_subject.end_time
+                        if (alt_start_time < keep_end_time and alt_end_time > keep_start_time):
+                            conflict_with_keep = True
                 
                 if conflict_with_keep:
                     continue
@@ -844,6 +922,8 @@ async def handle_schedule(
                         continue
                     if (active_entry["start"] <= alt_start_date <= active_entry["end"] or 
                         alt_start_date <= active_entry["start"] <= alt_end_date):
+                        if not has_day_overlap(active_entry, alt_entry):
+                            continue
                         # Kiểm tra trùng giờ học
                         active_start_time = active_entry["data"].start_time
                         active_end_time = active_entry["data"].end_time

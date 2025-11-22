@@ -75,6 +75,7 @@ class SubjectInput(BaseModel):
     instructor: str  # Tên giảng viên
     start_date: str  # Ngày bắt đầu học (format: "YYYY-MM-DD")
     end_date: str  # Ngày kết thúc học (format: "YYYY-MM-DD")
+    day: Optional[Union[str, List[str]]] = None  # Ngày học (VD: "T2" hoặc ["T2","T4"])
     priority: int = Field(default=5, ge=1, le=10)  # Độ ưu tiên (1-10, 10 là cao nhất)
     is_retake: Optional[bool] = False  # Đánh dấu môn học lại
     preferred_days: Optional[List[str]] = Field(default=None)  # Ưu tiên ngày học (VD: ["T2", "T3"])

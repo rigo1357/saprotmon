@@ -412,6 +412,7 @@ function SchedulerForm({ onGenerate }) {
         end_time: sessionData.end_time || '11:30',
         start_date: sessionData.start_date || new Date().toISOString().split('T')[0],
         end_date: sessionData.end_date || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        day: sessionData.day || course?.metadata?.day || null,
         subject_type: 'Lý thuyết',
       };
     }
@@ -429,6 +430,7 @@ function SchedulerForm({ onGenerate }) {
       end_time: '11:30',
       start_date: today.toISOString().split('T')[0], 
       end_date: endDate.toISOString().split('T')[0],
+      day: course.metadata?.day || null,
       subject_type: 'Lý thuyết',
     };
   };

@@ -84,7 +84,9 @@ SAMPLE_COURSES = {
     }
 }
 
-def generate_sessions_for_course(semester, num_sessions=20):
+SESSIONS_PER_COURSE = 1
+
+def generate_sessions_for_course(semester, num_sessions=SESSIONS_PER_COURSE):
     """
     Tạo nhiều sessions cho một môn học với các thời gian khác nhau.
     Mỗi session có cùng code, cùng tên môn nhưng khác thời gian học.
@@ -196,8 +198,8 @@ async def add_sample_courses():
     for semester, majors in SAMPLE_COURSES.items():
         for major, courses in majors.items():
             for course_data in courses:
-                # Tạo 20-21 sessions cho mỗi môn học
-                num_sessions = random.randint(20, 21)
+                # Chỉ tạo đúng số sessions cấu hình (mặc định 1)
+                num_sessions = SESSIONS_PER_COURSE
                 sessions = generate_sessions_for_course(semester, num_sessions)
                 
                 # Tạo một Course record cho mỗi session
@@ -241,7 +243,7 @@ async def add_sample_courses():
                     total_added += 1
                     total_sessions += 1
                 
-                print(f"✅ Đã thêm {num_sessions} sessions cho: {course_data['code']} - {course_data['name']} ({semester}, {major})")
+                print(f"✅ Đã thêm {num_sessions} session cho: {course_data['code']} - {course_data['name']} ({semester}, {major})")
     
     print(f"\n🎉 Hoàn thành! Đã thêm {total_added} môn học (sessions) mới.")
     print(f"📊 Tổng số sessions: {total_sessions}")
@@ -249,8 +251,8 @@ async def add_sample_courses():
     for semester, majors in SAMPLE_COURSES.items():
         print(f"\n  Học kỳ {semester}:")
         for major, courses in majors.items():
-            total_sessions_for_major = sum([random.randint(20, 21) for _ in courses])
-            print(f"    - {major}: {len(courses)} môn, ~{total_sessions_for_major} sessions")
+            total_sessions_for_major = len(courses) * SESSIONS_PER_COURSE
+            print(f"    - {major}: {len(courses)} môn, {total_sessions_for_major} session")
 
 if __name__ == "__main__":
     print("🚀 Bắt đầu thêm môn học mẫu...\n")

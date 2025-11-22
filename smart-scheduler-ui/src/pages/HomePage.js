@@ -164,6 +164,7 @@ function HomePage() {
             <span className="stat-label">Tự động hóa</span>
           </motion.div>
           <motion.div
+            Link to="/login"
             className="stat-item"
             initial={{ opacity: 0, scale: 0.8 }}
             whileInView={{ opacity: 1, scale: 1 }}

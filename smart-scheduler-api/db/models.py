@@ -10,7 +10,7 @@ from datetime import datetime # Thêm import này
 # =================
 class User(Document):
     id: UUID = Field(default_factory=uuid4)
-    full_name: str  # Họ và tên
+    full_name: str = Field(default="")  # Họ và tên
     username: str
     email: Optional[str] = None  # Dùng str thay vì EmailStr để linh hoạt hơn
     phone: Optional[str] = None  # Số điện thoại
