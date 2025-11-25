@@ -119,27 +119,27 @@ function ChatbotPage() {
     setInput('');
 
     try {
-      const response = await api.post('/api/chat', { 
+      const response = await api.post('/api/chat', {
         message: userMessage,
-        session_id: sessionId 
+        session_id: sessionId
       });
-      
+
       // Backend luôn trả về 200 với reply (kể cả khi có lỗi, reply sẽ chứa message lỗi)
       const botReply = response.data.reply || 'Xin lỗi, không nhận được phản hồi từ chatbot.';
       setMessages([...newMessages, { role: 'bot', content: botReply }]);
-      
+
       if (response.data.session_id) {
         setSessionId(response.data.session_id);
       }
-      
+
       // Reload lịch sử sau khi gửi tin nhắn
       loadChatHistory();
     } catch (error) {
       console.error('Lỗi chatbot:', error);
-      
+
       // Xử lý các loại lỗi khác nhau
       let errorMessage = 'Có lỗi xảy ra khi kết nối với chatbot';
-      
+
       if (error.response) {
         // Server trả về lỗi (4xx, 5xx)
         errorMessage = error.response.data?.detail || error.response.data?.reply || errorMessage;
@@ -150,7 +150,7 @@ function ChatbotPage() {
         // Lỗi khi setup request
         errorMessage = error.message || errorMessage;
       }
-      
+
       setMessages([...newMessages, { role: 'bot', content: 'Xin lỗi, tôi đang gặp sự cố: ' + errorMessage }]);
     } finally {
       setIsLoading(false);
@@ -173,15 +173,15 @@ function ChatbotPage() {
       <div className={`chatbot-sidebar ${showHistory ? 'open' : ''}`}>
         <div className="sidebar-header">
           <h3 style={{ margin: 0, color: '#22d3ee' }}>Lịch sử chat</h3>
-          <button 
-            onClick={() => setShowHistory(!showHistory)} 
+          <button
+            onClick={() => setShowHistory(!showHistory)}
             className="sidebar-toggle"
             style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '20px' }}
           >
             {showHistory ? '✕' : '☰'}
           </button>
         </div>
-        
+
         {showHistory && (
           <>
             <div className="sidebar-search">
@@ -198,11 +198,11 @@ function ChatbotPage() {
                 Tìm kiếm
               </button>
             </div>
-            
+
             <div className="sidebar-content">
               {(searchQuery ? searchResults : chatHistory).map((session) => (
                 <div key={session.session_id} className="history-item">
-                  <div 
+                  <div
                     className="history-item-content"
                     onClick={() => loadSession(session.session_id)}
                     style={{ cursor: 'pointer' }}
@@ -254,7 +254,7 @@ function ChatbotPage() {
             </button>
           </div>
         </div>
-        
+
         <div className="chatbot-messages">
           {messages.map((msg, index) => (
             <div
@@ -307,8 +307,29 @@ function ChatbotPage() {
 
 function SectionDivider({ title }) {
   return (
-    <div style={{ margin: '30px 0 15px', borderBottom: '1px dashed rgba(148,163,184,0.3)' }}>
-      <h3 style={{ color: '#22d3ee' }}>{title}</h3>
+    <div className="section-divider" style={{ margin: '40px 0 24px', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ 
+          height: '3px', 
+          flex: 1, 
+          background: 'linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.3), transparent)',
+          borderRadius: '2px'
+        }}></div>
+        <h3 style={{ 
+          fontSize: '1.5rem', 
+          fontWeight: 700,
+          margin: 0,
+          color: '#0c4a6e',
+          letterSpacing: '-0.02em',
+          whiteSpace: 'nowrap'
+        }}>{title}</h3>
+        <div style={{ 
+          height: '3px', 
+          flex: 1, 
+          background: 'linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.3), transparent)',
+          borderRadius: '2px'
+        }}></div>
+      </div>
     </div>
   );
 }
@@ -335,6 +356,46 @@ function SchedulerForm({ onGenerate }) {
   const [coursesError, setCoursesError] = useState(null);
   const [searchText, setSearchText] = useState('');
 
+  const [availableSemesters, setAvailableSemesters] = useState([]);
+  const [availableMajors, setAvailableMajors] = useState([]);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
+  const [metadataError, setMetadataError] = useState(null);
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      setIsLoadingMetadata(true);
+      setMetadataError(null);
+      try {
+        console.log('Đang tải metadata từ API...');
+        const [semRes, majRes] = await Promise.all([
+          api.get('/api/metadata/semesters'),
+          api.get('/api/metadata/majors')
+        ]);
+        
+        const semesters = semRes.data?.semesters || [];
+        const majors = majRes.data?.majors || [];
+        
+        console.log('Đã tải metadata:', { semesters, majors });
+        
+        setAvailableSemesters(semesters);
+        setAvailableMajors(majors);
+        
+        if (semesters.length === 0) {
+          console.warn('⚠️ Không có dữ liệu học kỳ trong database. Hãy chạy script add_sample_courses.py để thêm dữ liệu mẫu.');
+        }
+        if (majors.length === 0) {
+          console.warn('⚠️ Không có dữ liệu chuyên ngành trong database.');
+        }
+      } catch (err) {
+        console.error('❌ Lỗi tải metadata:', err);
+        setMetadataError(err.response?.data?.detail || err.message || 'Không thể tải dữ liệu từ server');
+      } finally {
+        setIsLoadingMetadata(false);
+      }
+    };
+    fetchMetadata();
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     const loadCourses = async () => {
@@ -343,7 +404,7 @@ function SchedulerForm({ onGenerate }) {
         setAvailableSubjects([]);
         return;
       }
-      
+
       setIsLoadingCourses(true);
       try {
         const params = { semester: studyInfo.semester };
@@ -351,7 +412,7 @@ function SchedulerForm({ onGenerate }) {
         if (studyInfo.major && studyInfo.major.trim()) {
           params.major = studyInfo.major.trim();
         }
-        
+
         const response = await api.get('/api/courses', { params });
         if (!isMounted) return;
         setAvailableSubjects(response.data?.items || []);
@@ -416,19 +477,19 @@ function SchedulerForm({ onGenerate }) {
         subject_type: 'Lý thuyết',
       };
     }
-    
+
     // Fallback: tạo từ course thông thường
     const today = new Date();
     const endDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
     return {
-      code: course.code, 
-      displayName: course.name, 
+      code: course.code,
+      displayName: course.name,
       name: `${course.code} - ${course.name}`,
-      credits: course.credits || 3, 
+      credits: course.credits || 3,
       instructor: course.department || '',
-      start_time: '07:00', 
+      start_time: '07:00',
       end_time: '11:30',
-      start_date: today.toISOString().split('T')[0], 
+      start_date: today.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
       day: course.metadata?.day || null,
       subject_type: 'Lý thuyết',
@@ -437,60 +498,66 @@ function SchedulerForm({ onGenerate }) {
 
   const handleSubjectToggle = async (course) => {
     // Lấy original_code (nếu là session có -G thì lấy phần trước -G)
-    const originalCode = course.metadata?.original_code || 
-                        (course.code.includes('-G') ? course.code.split('-G')[0] : course.code);
-    
-    // Kiểm tra xem đã có môn học này chưa (theo original_code)
+    const originalCode = course.metadata?.original_code ||
+      (course.code.includes('-G') ? course.code.split('-G')[0] : course.code);
+
+    // Kiểm tra xem đã có môn học này chưa (so sánh theo original_code hoặc code trực tiếp)
     const existing = selectedSubjects.find(item => {
       const itemOriginalCode = item.code.includes('-G') ? item.code.split('-G')[0] : item.code;
-      return itemOriginalCode === originalCode;
+      // So sánh cả originalCode và code trực tiếp để đảm bảo tìm được
+      return itemOriginalCode === originalCode || item.code === course.code || item.code === originalCode;
     });
-    
+
     if (existing) {
-      // Xóa tất cả sessions của môn học này
+      // Xóa môn học này (so sánh theo originalCode hoặc code trực tiếp)
       setSelectedSubjects(prev => prev.filter(item => {
         const itemOriginalCode = item.code.includes('-G') ? item.code.split('-G')[0] : item.code;
-        return itemOriginalCode !== originalCode;
+        // Giữ lại những môn không khớp với originalCode hoặc course.code
+        return itemOriginalCode !== originalCode && item.code !== course.code && item.code !== originalCode;
       }));
       return;
     }
-    
-    // Lấy tất cả sessions từ API
+
+    // Lấy chỉ session đầu tiên từ API
     try {
       const response = await api.get(`/api/courses/${originalCode}/sessions`, {
         params: { semester: studyInfo.semester }
       });
-      
+
       const sessions = response.data?.sessions || [];
       const isRetake = selectedTab === 'retake';
-      
+
       if (sessions.length > 0) {
-        // Thêm tất cả sessions vào selectedSubjects
-        const newSubjects = sessions.map(session => ({
-          ...buildSubjectPayload(course, session),
+        // Chỉ lấy session đầu tiên
+        const firstSession = sessions[0];
+        setSelectedSubjects(prev => [...prev, {
+          ...buildSubjectPayload(course, firstSession),
           is_retake: isRetake,
-        }));
-        
-        setSelectedSubjects(prev => [...prev, ...newSubjects]);
+        }]);
       } else {
         // Nếu không có sessions, thêm môn học thông thường
-        setSelectedSubjects(prev => [...prev, { 
-          ...buildSubjectPayload(course), 
-          is_retake: isRetake 
+        setSelectedSubjects(prev => [...prev, {
+          ...buildSubjectPayload(course),
+          is_retake: isRetake
         }]);
       }
     } catch (error) {
       console.error('Lỗi lấy sessions:', error);
       // Fallback: chỉ thêm môn học hiện tại
       const isRetake = selectedTab === 'retake';
-      setSelectedSubjects(prev => [...prev, { 
-        ...buildSubjectPayload(course), 
-        is_retake: isRetake 
+      setSelectedSubjects(prev => [...prev, {
+        ...buildSubjectPayload(course),
+        is_retake: isRetake
       }]);
     }
   };
 
-  const selectedCodes = selectedSubjects.map(s => s.code);
+  // Tạo danh sách các originalCode đã được chọn để kiểm tra
+  const selectedOriginalCodes = selectedSubjects.map(s => {
+    const code = s.code.includes('-G') ? s.code.split('-G')[0] : s.code;
+    return code;
+  });
+  
   const filteredSubjects = availableSubjects.filter(c => {
     if (!searchText) return true;
     return `${c.code} ${c.name}`.toLowerCase().includes(searchText.toLowerCase());
@@ -521,31 +588,83 @@ function SchedulerForm({ onGenerate }) {
 
   return (
     <div className="scheduler-main-card">
-      <h2 style={{ marginTop: 0, marginBottom: '20px' }}>1. Thông tin học tập</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '15px' }}>
-        <div>
+      <h2 style={{ marginTop: 0, marginBottom: '32px' }}>Thông tin học tập</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '24px', marginBottom: '16px' }}>
+        <div className="form-field-wrapper">
           <label>Học kỳ *</label>
-          <input
-            type="text" className="form-input" placeholder="VD: 2023-2"
-            value={studyInfo.semester} onChange={(e) => handleStudyFieldChange('semester', e.target.value)}
-          />
+          {isLoadingMetadata ? (
+            <div className="form-input" style={{ color: '#94a3b8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="loading-spinner" style={{ width: '16px', height: '16px', border: '2px solid rgba(148, 163, 184, 0.3)', borderTopColor: '#22d3ee', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></span>
+              Đang tải...
+            </div>
+          ) : metadataError ? (
+            <div className="form-input" style={{ color: '#f87171', borderColor: '#f87171', background: 'rgba(248, 113, 113, 0.1)' }}>
+              ⚠️ Lỗi: {metadataError}
+            </div>
+          ) : (
+            <select
+              className="form-input"
+              value={studyInfo.semester}
+              onChange={(e) => handleStudyFieldChange('semester', e.target.value)}
+              required
+            >
+              <option value="">-- Chọn học kỳ --</option>
+              {availableSemesters.length === 0 ? (
+                <option value="" disabled>Không có dữ liệu</option>
+              ) : (
+                availableSemesters.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))
+              )}
+            </select>
+          )}
+          {availableSemesters.length === 0 && !isLoadingMetadata && !metadataError && (
+            <div style={{ fontSize: '12px', color: '#fbbf24', marginTop: '8px', padding: '8px 12px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '8px', border: '1px solid rgba(251, 191, 36, 0.2)' }}>
+              ⚠️ Chưa có dữ liệu. Vui lòng upload môn học hoặc chạy script add_sample_courses.py
+            </div>
+          )}
         </div>
-        <div>
+        <div className="form-field-wrapper">
           <label>Chuyên ngành (tuỳ chọn)</label>
-          <input
-            type="text" className="form-input" placeholder="VD: CNTT"
-            value={studyInfo.major} onChange={(e) => handleStudyFieldChange('major', e.target.value)}
-          />
+          {isLoadingMetadata ? (
+            <div className="form-input" style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+              Đang tải...
+            </div>
+          ) : metadataError ? (
+            <div className="form-input" style={{ color: '#f87171', borderColor: '#f87171' }}>
+              Lỗi: {metadataError}
+            </div>
+          ) : (
+            <select
+              className="form-input"
+              value={studyInfo.major}
+              onChange={(e) => handleStudyFieldChange('major', e.target.value)}
+            >
+              <option value="">-- Chọn chuyên ngành --</option>
+              {availableMajors.length === 0 ? (
+                <option value="" disabled>Không có dữ liệu</option>
+              ) : (
+                availableMajors.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))
+              )}
+            </select>
+          )}
+          {availableMajors.length === 0 && !isLoadingMetadata && !metadataError && (
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px', padding: '8px 12px', background: 'rgba(148, 163, 184, 0.1)', borderRadius: '8px', border: '1px solid rgba(148, 163, 184, 0.15)' }}>
+              Chưa có dữ liệu chuyên ngành
+            </div>
+          )}
         </div>
-        <div>
-          <label>Số tín chỉ tối đa *</label>
+        <div className="form-field-wrapper">
+          <label>Tín chỉ tối đa *</label>
           <input
-            type="number" min="0" className="form-input" placeholder="VD: 18"
+            type="number" min="0" className="form-input" placeholder="18"
             value={studyInfo.maxCredits} onChange={(e) => handleMaxCreditsChange(e.target.value)}
           />
         </div>
-        <div>
-          <label>Số tín chỉ tối thiểu (2/3 tối đa)</label>
+        <div className="form-field-wrapper">
+          <label>Tín chỉ tối thiểu</label>
           <input
             type="number" className="form-input input-readonly" readOnly placeholder="Tự động tính"
             value={studyInfo.minCredits}
@@ -553,8 +672,8 @@ function SchedulerForm({ onGenerate }) {
         </div>
       </div>
 
-      <SectionDivider title="2. Thời gian rảnh" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '12px' }}>
+      <SectionDivider title="Thời gian rảnh" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '16px' }}>
         {Object.keys(freeTime).map((day) => (
           <div key={day} className="time-card">
             <h4>{dayTitle[day]}</h4>
@@ -574,7 +693,7 @@ function SchedulerForm({ onGenerate }) {
         ))}
       </div>
 
-      <SectionDivider title="3. Chọn môn học" />
+      <SectionDivider title="Chọn môn học" />
       <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
         <button onClick={() => setSelectedTab('current')} className={`tab-button ${selectedTab === 'current' ? 'active' : 'inactive'}`}>
           Môn học hiện tại
@@ -583,7 +702,7 @@ function SchedulerForm({ onGenerate }) {
           Môn học Lại
         </button>
       </div>
-      
+
       <div style={{ marginBottom: '10px' }}>
         <input
           type="text" value={searchText} onChange={(e) => setSearchText(e.target.value)}
@@ -594,49 +713,53 @@ function SchedulerForm({ onGenerate }) {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '25px' }}>
         <div className="subject-list-container">
           {isLoadingCourses ? <p>Đang tải danh sách môn học...</p> :
-           coursesError ? <p style={{ color: '#f87171' }}>{coursesError}</p> :
-           filteredSubjects.length === 0 ? <p style={{ color: '#94a3b8' }}>Không tìm thấy môn học.</p> :
-           filteredSubjects.map((course) => {
-             const selected = selectedCodes.includes(course.code);
-             return (
-               <label key={course.code} className={`subject-item ${selected ? 'selected' : 'default'}`}>
-                 <div>
-                   <strong>{course.code}</strong> - {course.name}
-                   <div style={{ color: '#94a3b8', fontSize: '13px' }}>{course.credits || 0} tín chỉ</div>
-                 </div>
-                 {selectedTab === 'current' ? (
-                   <input type="checkbox" checked={selected} onChange={() => handleSubjectToggle(course)} />
-                 ) : <span style={{ color: '#94a3b8', fontSize: '12px' }}>Đang xem</span>}
-               </label>
-             );
-           })}
+            coursesError ? <p style={{ color: '#f87171' }}>{coursesError}</p> :
+              filteredSubjects.length === 0 ? <p style={{ color: '#94a3b8' }}>Không tìm thấy môn học.</p> :
+                filteredSubjects.map((course) => {
+                  // Kiểm tra xem môn này đã được chọn chưa (so sánh theo originalCode)
+                  const courseOriginalCode = course.metadata?.original_code ||
+                    (course.code.includes('-G') ? course.code.split('-G')[0] : course.code);
+                  const selected = selectedOriginalCodes.includes(courseOriginalCode) || 
+                                   selectedSubjects.some(s => s.code === course.code);
+                  return (
+                    <label key={course.code} className={`subject-item ${selected ? 'selected' : 'default'}`}>
+                      <div>
+                        <strong>{course.code}</strong> - {course.name}
+                        <div style={{ color: '#94a3b8', fontSize: '13px' }}>{course.credits || 0} tín chỉ</div>
+                      </div>
+                      {selectedTab === 'current' ? (
+                        <input type="checkbox" checked={selected} onChange={() => handleSubjectToggle(course)} />
+                      ) : <span style={{ color: '#94a3b8', fontSize: '12px' }}>Đang xem</span>}
+                    </label>
+                  );
+                })}
         </div>
-        <div style={{ border: '1px solid rgba(148,163,184,0.2)', borderRadius: '16px', padding: '15px', backgroundColor: 'rgba(15,23,42,0.7)' }}>
-          <h4 style={{ marginTop: 0 }}>Môn đã chọn ({selectedSubjects.length})</h4>
-          {selectedSubjects.length === 0 ? <p style={{ color: '#94a3b8' }}>Chưa chọn môn nào.</p> :
-           selectedSubjects.map((subject, index) => (
-             <div key={subject.code} style={{ padding: '10px 0', borderBottom: '1px solid rgba(148,163,184,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <div>
-                 <strong>{subject.name}</strong>
-                 <div style={{ fontSize: '13px', color: '#94a3b8' }}>
-                   {subject.credits} TC • Ưu tiên {calculatePriority(subject, index)}/10
-                 </div>
-               </div>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                 <button onClick={() => moveSubject(index, -1)} disabled={index === 0} className="priority-btn up">↑</button>
-                 <button onClick={() => moveSubject(index, 1)} disabled={index === selectedSubjects.length - 1} className="priority-btn down">↓</button>
-               </div>
-             </div>
-           ))}
+        <div style={{ border: '2px solid #e2e8f0', borderRadius: '16px', padding: '20px', backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+          <h4 style={{ marginTop: 0, color: '#0c4a6e', fontSize: '1.1rem', fontWeight: 700 }}>Môn đã chọn ({selectedSubjects.length})</h4>
+          {selectedSubjects.length === 0 ? <p style={{ color: '#64748b', marginTop: '16px' }}>Chưa chọn môn nào.</p> :
+            selectedSubjects.map((subject, index) => (
+              <div key={subject.code} style={{ padding: '12px 0', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong style={{ color: '#1e293b' }}>{subject.name}</strong>
+                  <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                    {subject.credits} TC • Ưu tiên {calculatePriority(subject, index)}/10
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button onClick={() => moveSubject(index, -1)} disabled={index === 0} className="priority-btn up">↑</button>
+                  <button onClick={() => moveSubject(index, 1)} disabled={index === selectedSubjects.length - 1} className="priority-btn down">↓</button>
+                </div>
+              </div>
+            ))}
         </div>
       </div>
 
-      <SectionDivider title="4. Ràng buộc bổ sung" />
+      <SectionDivider title="Ràng buộc bổ sung" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '15px' }}>
-        <ConstraintToggle label="Tránh xếp các môn học liên tiếp" checked={constraints.avoidConsecutive} onChange={(c) => setConstraints({...constraints, avoidConsecutive: c})} />
-        <ConstraintToggle label="Cân bằng số môn học giữa các ngày" checked={constraints.balanceDays} onChange={(c) => setConstraints({...constraints, balanceDays: c})} />
-        <ConstraintToggle label="Ưu tiên học buổi sáng" checked={constraints.preferMorning} onChange={(c) => setConstraints({...constraints, preferMorning: c})} />
-        <ConstraintToggle label="Cho phép học thứ 7" checked={constraints.allowSaturday} onChange={(c) => setConstraints({...constraints, allowSaturday: c})} />
+        <ConstraintToggle label="Tránh xếp các môn học liên tiếp" checked={constraints.avoidConsecutive} onChange={(c) => setConstraints({ ...constraints, avoidConsecutive: c })} />
+        <ConstraintToggle label="Cân bằng số môn học giữa các ngày" checked={constraints.balanceDays} onChange={(c) => setConstraints({ ...constraints, balanceDays: c })} />
+        <ConstraintToggle label="Ưu tiên học buổi sáng" checked={constraints.preferMorning} onChange={(c) => setConstraints({ ...constraints, preferMorning: c })} />
+        <ConstraintToggle label="Cho phép học thứ 7" checked={constraints.allowSaturday} onChange={(c) => setConstraints({ ...constraints, allowSaturday: c })} />
       </div>
 
       <div style={{ marginTop: '25px', textAlign: 'center' }}>
@@ -687,14 +810,14 @@ function ScheduleTable({ schedule }) {
                 return (
                   <td key={key} className="schedule-td">
                     {items.length === 0 ? <span style={{ color: '#475569', fontStyle: 'italic' }}>Trống</span> :
-                     items.map((item, idx) => (
-                       <div key={idx} style={{ backgroundColor: item.is_retake ? 'rgba(251,113,133,0.2)' : 'rgba(59,130,246,0.2)', borderLeft: `4px solid ${item.is_retake ? '#fb7185' : '#38bdf8'}`, borderRadius: '10px', padding: '8px', marginBottom: '8px' }}>
-                         <strong>{item.subject}</strong>
-                         <div style={{ fontSize: '12px', color: '#94a3b8' }}>GV: {item.instructor || 'Chưa cập nhật'}</div>
-                         <div style={{ fontSize: '12px', color: '#94a3b8' }}>{item.start_time} - {item.end_time}</div>
-                         {item.is_retake && <div style={{ fontSize: '11px', color: '#fda4af' }}>Môn học lại</div>}
-                       </div>
-                     ))}
+                      items.map((item, idx) => (
+                        <div key={idx} style={{ backgroundColor: item.is_retake ? 'rgba(251,113,133,0.2)' : 'rgba(59,130,246,0.2)', borderLeft: `4px solid ${item.is_retake ? '#fb7185' : '#38bdf8'}`, borderRadius: '10px', padding: '8px', marginBottom: '8px' }}>
+                          <strong>{item.subject}</strong>
+                          <div style={{ fontSize: '12px', color: '#94a3b8' }}>GV: {item.instructor || 'Chưa cập nhật'}</div>
+                          <div style={{ fontSize: '12px', color: '#94a3b8' }}>{item.start_time} - {item.end_time}</div>
+                          {item.is_retake && <div style={{ fontSize: '11px', color: '#fda4af' }}>Môn học lại</div>}
+                        </div>
+                      ))}
                   </td>
                 );
               })}
@@ -715,10 +838,10 @@ function Scheduler() {
   const handleGenerate = async (formData) => {
     setIsLoading(true);
     try {
-        // ... Logic giữ nguyên như cũ ...
+      // ... Logic giữ nguyên như cũ ...
       const payloadSubjects = formData.subjects.map((subject) => ({
-         // (Em rút gọn đoạn này để đỡ dài, logic mapping giữ nguyên nhé)
-         ...subject, is_retake: subject.is_retake || false,
+        // (Em rút gọn đoạn này để đỡ dài, logic mapping giữ nguyên nhé)
+        ...subject, is_retake: subject.is_retake || false,
       }));
       const response = await api.post('/api/schedule', {
         subjects: payloadSubjects,

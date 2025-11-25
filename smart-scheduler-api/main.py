@@ -552,6 +552,42 @@ async def list_courses(
         ],
     )
 
+@app.get("/api/metadata/semesters")
+async def get_semesters(current_user: User = Depends(get_current_user)):
+    """Lấy danh sách các học kỳ có trong database."""
+    try:
+        # Thử dùng get_pymongo_collection() trước
+        collection = Course.get_pymongo_collection()
+        pipeline = [
+            {"$group": {"_id": "$semester"}},
+            {"$sort": {"_id": -1}} # Sắp xếp giảm dần (mới nhất lên đầu)
+        ]
+        results = await collection.aggregate(pipeline).to_list(length=None)
+        semesters = [r["_id"] for r in results if r["_id"]]
+    except Exception:
+        # Fallback: lấy tất cả courses và lọc unique bằng Python
+        courses = await Course.find({}).to_list()
+        semesters = sorted(set(c.semester for c in courses if c.semester), reverse=True)
+    return {"semesters": semesters}
+
+@app.get("/api/metadata/majors")
+async def get_majors(current_user: User = Depends(get_current_user)):
+    """Lấy danh sách các chuyên ngành có trong database."""
+    try:
+        # Thử dùng get_pymongo_collection() trước
+        collection = Course.get_pymongo_collection()
+        pipeline = [
+            {"$group": {"_id": "$major"}},
+            {"$sort": {"_id": 1}}
+        ]
+        results = await collection.aggregate(pipeline).to_list(length=None)
+        majors = [r["_id"] for r in results if r["_id"]]
+    except Exception:
+        # Fallback: lấy tất cả courses và lọc unique bằng Python
+        courses = await Course.find({}).to_list()
+        majors = sorted(set(c.major for c in courses if c.major))
+    return {"majors": majors}
+
 @app.post("/api/admin/upload-courses", response_model=CourseUploadResponse)
 async def upload_courses(
     semester: str = Form(...),
@@ -563,16 +599,47 @@ async def upload_courses(
     try:
         file_bytes = await file.read()
         courses = []
-        if file.filename.endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(file_bytes))
+        filename = file.filename.lower()
+        
+        if filename.endswith('.csv'):
+            # Thử đọc CSV với nhiều encoding khác nhau
+            try:
+                # 1. Thử UTF-8
+                df = pd.read_csv(io.BytesIO(file_bytes), encoding='utf-8')
+            except UnicodeDecodeError:
+                try:
+                    # 2. Thử CP1258 (Vietnamese)
+                    df = pd.read_csv(io.BytesIO(file_bytes), encoding='cp1258')
+                except UnicodeDecodeError:
+                    try:
+                        # 3. Thử Latin1 (fallback chung)
+                        df = pd.read_csv(io.BytesIO(file_bytes), encoding='latin1')
+                    except Exception:
+                        # 4. Nếu vẫn lỗi, có thể là file Excel bị đổi đuôi thành .csv
+                        try:
+                            df = pd.read_excel(io.BytesIO(file_bytes))
+                        except Exception:
+                             raise HTTPException(status_code=400, detail="Không thể đọc file CSV. Vui lòng kiểm tra encoding (UTF-8) hoặc định dạng file.")
+            except pd.errors.ParserError:
+                 # Lỗi parse CSV, có thể là file Excel
+                try:
+                    df = pd.read_excel(io.BytesIO(file_bytes))
+                except Exception:
+                    raise HTTPException(status_code=400, detail="File CSV không hợp lệ.")
+            
             courses = _dataframe_to_courses(df)
-        elif file.filename.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(io.BytesIO(file_bytes))
-            courses = _dataframe_to_courses(df)
-        elif file.filename.endswith('.pdf'):
+            
+        elif filename.endswith(('.xls', '.xlsx')):
+            try:
+                df = pd.read_excel(io.BytesIO(file_bytes))
+                courses = _dataframe_to_courses(df)
+            except Exception as e:
+                 raise HTTPException(status_code=400, detail=f"Lỗi đọc file Excel: {str(e)}")
+                 
+        elif filename.endswith('.pdf'):
             courses = _parse_pdf_courses(file_bytes)
         else:
-            raise HTTPException(status_code=400, detail="Định dạng file không được hỗ trợ")
+            raise HTTPException(status_code=400, detail="Định dạng file không được hỗ trợ (chỉ hỗ trợ .csv, .xls, .xlsx, .pdf)")
         
         inserted = 0
         for course_data in courses:

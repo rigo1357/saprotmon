@@ -33,6 +33,9 @@ function AdminPage() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState(null);
 
+  const [availableSemesters, setAvailableSemesters] = useState([]);
+  const [availableMajors, setAvailableMajors] = useState([]);
+
   const fetchCourses = async () => {
     setIsLoadingCourses(true);
     try {
@@ -49,9 +52,23 @@ function AdminPage() {
     }
   };
 
+  const fetchMetadata = async () => {
+    try {
+      const [semRes, majRes] = await Promise.all([
+        api.get('/api/metadata/semesters'),
+        api.get('/api/metadata/majors')
+      ]);
+      setAvailableSemesters(semRes.data?.semesters || []);
+      setAvailableMajors(majRes.data?.majors || []);
+    } catch (err) {
+      console.error('Lỗi tải metadata:', err);
+    }
+  };
+
   useEffect(() => {
     fetchCourses();
     fetchUsers();
+    fetchMetadata();
   }, [semester, major]);
 
   const fetchUsers = async () => {
@@ -123,6 +140,7 @@ function AdminPage() {
       setUploadInfo(response.data);
       setSelectedFile(null);
       await fetchCourses();
+      await fetchMetadata(); // Refresh metadata lists
     } catch (err) {
       console.error(err);
       const errorMessage = err.response?.data?.detail || err.message || 'Upload thất bại';
@@ -160,6 +178,7 @@ function AdminPage() {
       });
       setManualCourse({ code: '', name: '', credits: '', department: '', major: '' });
       await fetchCourses();
+      await fetchMetadata(); // Refresh metadata lists
     } catch (err) {
       console.error(err);
       const message = err.response?.data?.detail || err.message || 'Không thể thêm môn.';
@@ -224,21 +243,34 @@ function AdminPage() {
             <div className="admin-form-group">
               <label className="admin-form-label">Chuyên ngành (Tuỳ chọn)</label>
               <input
+                list="major-list"
                 type="text"
                 value={major}
                 onChange={(e) => setMajor(e.target.value)}
                 placeholder="VD: KTPM"
                 className="admin-form-input"
               />
+              <datalist id="major-list">
+                {availableMajors.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </div>
             <div className="admin-form-group">
               <label className="admin-form-label">Học kỳ *</label>
               <input
+                list="semester-list"
                 type="text"
                 value={semester}
                 onChange={(e) => setSemester(e.target.value)}
                 className="admin-form-input"
+                placeholder="VD: 2023-2"
               />
+              <datalist id="semester-list">
+                {availableSemesters.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
             <div className="admin-form-group">
               <label className="admin-form-label">Bộ môn / Khoa (Tuỳ chọn)</label>
