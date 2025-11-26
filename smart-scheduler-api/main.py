@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from uuid import uuid4, UUID
@@ -18,7 +19,8 @@ from schemas import (
     CourseBase, CourseCreate, CourseListResponse, CourseUploadResponse,
     ChatInput, ChatMessage, ChatHistoryResponse, ChatSearchResponse,
     UserResponse, UserListResponse,
-    ForgotPasswordRequest, VerifyOTPRequest, ResetPasswordRequest
+    ForgotPasswordRequest, VerifyOTPRequest, ResetPasswordRequest,
+    DeleteCoursesRequest
 )
 from auth.security import (
     get_password_hash, verify_password, create_access_token,
@@ -402,14 +404,20 @@ async def handle_chat(
         # Trả về message lỗi thân thiện thay vì raise HTTPException
         error_message = "Xin lỗi, tôi đang gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau."
         
-        # Kiểm tra loại lỗi cụ thể
+        # Kiểm tra loại lỗi cụ thể từ exception message
         error_str = str(e).lower()
-        if "connection" in error_str or "refused" in error_str or "connect" in error_str:
+        error_type = type(e).__name__.lower()
+        
+        # Kiểm tra các loại lỗi kết nối
+        if any(keyword in error_str for keyword in ["connection", "refused", "connect", "cannot connect", "không thể kết nối"]):
             error_message = "Xin lỗi, tôi không thể kết nối với mô hình AI. Vui lòng kiểm tra Ollama đã được khởi động chưa (chạy 'ollama serve' trong terminal)."
-        elif "timeout" in error_str:
+        elif "timeout" in error_str or "timed out" in error_str:
             error_message = "Xin lỗi, yêu cầu đã hết thời gian chờ. Vui lòng thử lại."
-        elif "model" in error_str or "not found" in error_str:
-            error_message = "Xin lỗi, mô hình AI chưa được tải. Vui lòng chạy 'ollama pull gemma2:9b' hoặc 'ollama pull gemma2:2b' trong terminal."
+        elif any(keyword in error_str for keyword in ["model", "not found", "chưa được tải"]):
+            error_message = "Xin lỗi, mô hình AI chưa được tải. Vui lòng chạy 'ollama pull gemma2:2b' trong terminal."
+        elif "ollama" in error_str:
+            # Nếu exception message đã chứa thông tin về Ollama, sử dụng nó
+            error_message = str(e)
         
         # Lưu message lỗi vào database (nếu có thể)
         try:
@@ -420,9 +428,10 @@ async def handle_chat(
                 role="assistant"
             )
             await bot_message.save()
-        except:
-            pass
+        except Exception as save_error:
+            print(f"Lỗi khi lưu message lỗi: {save_error}")
         
+        # Luôn trả về response với status 200 để frontend không coi là lỗi network
         return {"reply": error_message, "session_id": session_id}
 
 @app.get("/api/chat/history", response_model=List[ChatHistoryResponse])
@@ -540,6 +549,7 @@ async def list_courses(
         total=len(courses),
         items=[
             CourseBase(
+                id=str(course.id),
                 code=course.code,
                 name=course.name,
                 credits=course.credits,
@@ -604,22 +614,30 @@ async def upload_courses(
         if filename.endswith('.csv'):
             # Thử đọc CSV với nhiều encoding khác nhau
             try:
-                # 1. Thử UTF-8
-                df = pd.read_csv(io.BytesIO(file_bytes), encoding='utf-8')
+                # 1. Thử UTF-8 với BOM (UTF-8-sig)
+                if file_bytes.startswith(b'\xef\xbb\xbf'):
+                    df = pd.read_csv(io.BytesIO(file_bytes), encoding='utf-8-sig')
+                else:
+                    # 2. Thử UTF-8 thường
+                    df = pd.read_csv(io.BytesIO(file_bytes), encoding='utf-8')
             except UnicodeDecodeError:
                 try:
-                    # 2. Thử CP1258 (Vietnamese)
-                    df = pd.read_csv(io.BytesIO(file_bytes), encoding='cp1258')
+                    # 3. Thử UTF-8-sig (có thể có BOM nhưng không detect được)
+                    df = pd.read_csv(io.BytesIO(file_bytes), encoding='utf-8-sig')
                 except UnicodeDecodeError:
                     try:
-                        # 3. Thử Latin1 (fallback chung)
-                        df = pd.read_csv(io.BytesIO(file_bytes), encoding='latin1')
-                    except Exception:
-                        # 4. Nếu vẫn lỗi, có thể là file Excel bị đổi đuôi thành .csv
+                        # 4. Thử CP1258 (Vietnamese Windows)
+                        df = pd.read_csv(io.BytesIO(file_bytes), encoding='cp1258')
+                    except UnicodeDecodeError:
                         try:
-                            df = pd.read_excel(io.BytesIO(file_bytes))
+                            # 5. Thử Latin1 (fallback chung)
+                            df = pd.read_csv(io.BytesIO(file_bytes), encoding='latin1')
                         except Exception:
-                             raise HTTPException(status_code=400, detail="Không thể đọc file CSV. Vui lòng kiểm tra encoding (UTF-8) hoặc định dạng file.")
+                            # 6. Nếu vẫn lỗi, có thể là file Excel bị đổi đuôi thành .csv
+                            try:
+                                df = pd.read_excel(io.BytesIO(file_bytes))
+                            except Exception:
+                                 raise HTTPException(status_code=400, detail="Không thể đọc file CSV. Vui lòng kiểm tra encoding (UTF-8) hoặc định dạng file.")
             except pd.errors.ParserError:
                  # Lỗi parse CSV, có thể là file Excel
                 try:
@@ -693,6 +711,109 @@ async def create_course(
         major=new_course.major,
         metadata=new_course.metadata,
     )
+
+@app.get("/api/admin/courses/export")
+async def export_courses_csv(
+    semester: Optional[str] = None,
+    major: Optional[str] = None,
+    current_admin: User = Depends(admin_required),
+):
+    """Xuất danh sách môn học ra file CSV với UTF-8 BOM để đảm bảo font chữ đúng."""
+    query: Dict[str, Any] = {}
+    if semester:
+        query["semester"] = semester
+    if major:
+        query["major"] = major
+
+    courses = await Course.find(query).sort("code").to_list()
+    
+    # Tạo DataFrame
+    data = []
+    for course in courses:
+        data.append({
+            "code": course.code,
+            "name": course.name,
+            "credits": course.credits,
+            "department": course.department or "",
+            "semester": course.semester,
+            "major": course.major or ""
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Tạo CSV với UTF-8 BOM để Excel và các ứng dụng khác đọc đúng font
+    output = io.StringIO()
+    # Ghi BOM UTF-8
+    output.write('\ufeff')
+    df.to_csv(output, index=False, encoding='utf-8', lineterminator='\n')
+    output.seek(0)
+    
+    # Tạo tên file
+    filename = f"courses_{semester or 'all'}_{major or 'all'}.csv"
+    
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Encoding": "utf-8"
+        }
+    )
+
+@app.delete("/api/admin/courses")
+async def delete_courses(
+    request: DeleteCoursesRequest,
+    current_admin: User = Depends(admin_required),
+):
+    """Xóa một hoặc nhiều môn học theo danh sách ID."""
+    course_ids = request.course_ids
+    if not course_ids:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn ít nhất một môn học để xóa")
+    
+    deleted_count = 0
+    not_found = []
+    
+    for course_id_str in course_ids:
+        try:
+            course_uuid = UUID(course_id_str)
+            course = await Course.get(course_uuid)
+            if course:
+                await course.delete()
+                deleted_count += 1
+            else:
+                not_found.append(course_id_str)
+        except ValueError:
+            not_found.append(course_id_str)
+        except Exception as e:
+            print(f"Lỗi khi xóa môn học {course_id_str}: {e}")
+    
+    message = f"Đã xóa thành công {deleted_count} môn học."
+    if not_found:
+        message += f" Không tìm thấy {len(not_found)} môn học."
+    
+    return {
+        "message": message,
+        "deleted_count": deleted_count,
+        "not_found": not_found
+    }
+
+@app.delete("/api/admin/courses/{course_id}")
+async def delete_course(
+    course_id: str,
+    current_admin: User = Depends(admin_required),
+):
+    """Xóa một môn học theo ID."""
+    try:
+        course_uuid = UUID(course_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID môn học không hợp lệ")
+    
+    course = await Course.get(course_uuid)
+    if not course:
+        raise HTTPException(status_code=404, detail="Không tìm thấy môn học")
+    
+    await course.delete()
+    return {"message": f"Đã xóa môn học {course.code} - {course.name} thành công", "deleted_course_id": course_id}
 
 # =================
 # API QUẢN LÝ NGƯỜI DÙNG (ADMIN)

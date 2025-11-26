@@ -78,6 +78,7 @@ export const exportToExcel = (schedule, title = 'Thời khóa biểu') => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Thời khóa biểu');
   
+  // XLSX files are binary format, UTF-8 is handled internally
   XLSX.writeFile(workbook, `${title.replace(/\s/g, '_')}.xlsx`);
 };
 

@@ -107,6 +107,7 @@
 # smart-scheduler-api/chatbot/client.py
 
 import aiohttp
+import asyncio
 
 OLLAMA_API_URL = "http://localhost:11434/api/chat"
 
@@ -155,16 +156,24 @@ async def get_bot_response(user_message: str, context_messages: list = None):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(OLLAMA_API_URL, json=payload, timeout=60) as resp:
-                if resp.status != 200:
-                    return f"Lỗi server Ollama: {resp.status}"
+            try:
+                async with session.post(OLLAMA_API_URL, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                    if resp.status != 200:
+                        error_text = await resp.text()
+                        return f"Lỗi server Ollama (status {resp.status}): {error_text[:200]}"
 
-                data = await resp.json()
-                return data["message"]["content"]
+                    data = await resp.json()
+                    if "message" in data and "content" in data["message"]:
+                        return data["message"]["content"]
+                    else:
+                        return "Không nhận được phản hồi hợp lệ từ Ollama."
+            except asyncio.TimeoutError:
+                raise Exception("Timeout: Ollama không phản hồi trong 60 giây. Vui lòng kiểm tra Ollama có đang chạy không.")
+            except aiohttp.ClientConnectorError as e:
+                raise Exception(f"Không thể kết nối đến Ollama tại {OLLAMA_API_URL}. Vui lòng kiểm tra Ollama đã được khởi động chưa (chạy 'ollama serve' trong terminal).")
+            except aiohttp.ClientError as e:
+                raise Exception(f"Lỗi kết nối đến Ollama: {str(e)}")
 
-    except aiohttp.ClientConnectionError:
-        return "Không thể kết nối đến server Ollama. Vui lòng kiểm tra xem Ollama có đang chạy không."
-    except aiohttp.ClientError as e:
-        return f"Lỗi kết nối: {str(e)}"
     except Exception as e:
-        return f"Đã xảy ra lỗi: {str(e)}"
+        # Re-raise để main.py có thể xử lý
+        raise

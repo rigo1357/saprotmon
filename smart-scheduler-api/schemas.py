@@ -105,6 +105,7 @@ class ScheduleInput(BaseModel):
 
 # --- Khuôn cho môn học (DB <-> API) ---
 class CourseBase(BaseModel):
+    id: Optional[str] = None  # ID của môn học để xóa
     code: str
     name: str
     credits: int = 0
@@ -160,3 +161,6 @@ class ResetPasswordRequest(BaseModel):
         if 'new_password' in info.data and v != info.data['new_password']:
             raise ValueError('Mật khẩu xác nhận không khớp')
         return v
+
+class DeleteCoursesRequest(BaseModel):
+    course_ids: List[str]

@@ -35,20 +35,41 @@ function AdminPage() {
 
   const [availableSemesters, setAvailableSemesters] = useState([]);
   const [availableMajors, setAvailableMajors] = useState([]);
+  
+  // State cho view mode và selection
+  const [viewMode, setViewMode] = useState('semester'); // 'all' hoặc 'semester'
+  const [selectedCourses, setSelectedCourses] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
+  
+  // State cho modal xác nhận xóa
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [coursesToDelete, setCoursesToDelete] = useState([]);
 
   const fetchCourses = async () => {
     setIsLoadingCourses(true);
     try {
       const response = await api.get('/api/courses', {
-        params: { semester, major: major || undefined },
+        params: { semester: viewMode === 'semester' ? semester : undefined, major: major || undefined },
       });
-      setCourses(response.data?.items || []);
+      const coursesData = response.data?.items || [];
+      setCourses(coursesData);
       setError(null);
     } catch (err) {
       console.error(err);
       setError('Không thể tải danh sách môn học. Vui lòng thử lại.');
     } finally {
       setIsLoadingCourses(false);
+    }
+  };
+
+  const fetchAllCourses = async () => {
+    try {
+      const response = await api.get('/api/courses', {
+        params: { major: major || undefined },
+      });
+      setAllCourses(response.data?.items || []);
+    } catch (err) {
+      console.error('Lỗi tải tất cả môn học:', err);
     }
   };
 
@@ -66,10 +87,63 @@ function AdminPage() {
   };
 
   useEffect(() => {
-    fetchCourses();
+    if (viewMode === 'all') {
+      fetchAllCourses();
+    } else {
+      fetchCourses();
+    }
     fetchUsers();
     fetchMetadata();
-  }, [semester, major]);
+  }, [semester, major, viewMode]);
+
+  const handleDeleteCourses = (courseIds) => {
+    if (!courseIds || courseIds.length === 0) {
+      alert('Vui lòng chọn ít nhất một môn học để xóa.');
+      return;
+    }
+    setCoursesToDelete(courseIds);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteCourses = async () => {
+    try {
+      const response = await api.delete('/api/admin/courses', {
+        data: { course_ids: coursesToDelete }
+      });
+      setSelectedCourses([]);
+      setShowDeleteModal(false);
+      setCoursesToDelete([]);
+      if (viewMode === 'all') {
+        await fetchAllCourses();
+      } else {
+        await fetchCourses();
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi khi xóa môn học: ' + (err.response?.data?.detail || err.message));
+      setShowDeleteModal(false);
+      setCoursesToDelete([]);
+    }
+  };
+
+  const handleToggleSelectCourse = (courseId) => {
+    setSelectedCourses(prev => {
+      if (prev.includes(courseId)) {
+        return prev.filter(id => id !== courseId);
+      } else {
+        return [...prev, courseId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    const currentCourses = viewMode === 'all' ? allCourses : courses;
+    if (selectedCourses.length === currentCourses.length) {
+      setSelectedCourses([]);
+    } else {
+      setSelectedCourses(currentCourses.map(c => c.id).filter(Boolean));
+    }
+  };
 
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
@@ -404,18 +478,134 @@ function AdminPage() {
         >
           <div className="admin-section-header">
             <div>
-              <h2>📚 3. Môn học trong học kỳ {semester}</h2>
-              <p>Danh sách này sẽ xuất hiện cho sinh viên khi chọn môn.</p>
+              <h2>📚 3. Quản lý môn học</h2>
+              <p>Danh sách môn học trong hệ thống. Chọn chế độ xem và quản lý môn học.</p>
             </div>
-            <motion.button
-              onClick={fetchCourses}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="admin-refresh-btn"
-            >
-              🔄 Làm mới
-            </motion.button>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setViewMode('semester')}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    background: viewMode === 'semester' ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e5e7eb',
+                    color: viewMode === 'semester' ? '#fff' : '#374151',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '14px'
+                  }}
+                >
+                  Theo kỳ
+                </button>
+                <button
+                  onClick={() => setViewMode('all')}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    background: viewMode === 'all' ? 'linear-gradient(135deg, #667eea, #764ba2)' : '#e5e7eb',
+                    color: viewMode === 'all' ? '#fff' : '#374151',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '14px'
+                  }}
+                >
+                  Tất cả môn
+                </button>
+              </div>
+              {selectedCourses.length > 0 && (
+                <motion.button
+                  onClick={() => handleDeleteCourses(selectedCourses)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="admin-refresh-btn"
+                  style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+                >
+                  🗑️ Xóa ({selectedCourses.length})
+                </motion.button>
+              )}
+              <motion.button
+                onClick={async () => {
+                  try {
+                    const currentSemester = viewMode === 'semester' ? semester : undefined;
+                    const response = await api.get('/api/admin/courses/export', {
+                      params: { semester: currentSemester, major: major || undefined },
+                      responseType: 'blob',
+                    });
+                    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv;charset=utf-8;' }));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `courses_${currentSemester || 'all'}_${major || 'all'}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                  } catch (err) {
+                    console.error(err);
+                    alert('Lỗi khi tải file CSV: ' + (err.response?.data?.detail || err.message));
+                  }
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="admin-refresh-btn"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+              >
+                📥 Tải CSV
+              </motion.button>
+              <motion.button
+                onClick={() => {
+                  if (viewMode === 'all') {
+                    fetchAllCourses();
+                  } else {
+                    fetchCourses();
+                  }
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="admin-refresh-btn"
+              >
+                🔄 Làm mới
+              </motion.button>
+            </div>
           </div>
+          
+          {viewMode === 'semester' && (
+            <div style={{ 
+              marginBottom: '15px', 
+              padding: '15px', 
+              background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)', 
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '15px',
+              flexWrap: 'wrap'
+            }}>
+              <label style={{ fontWeight: '600', color: '#374151', fontSize: '14px' }}>
+                Chọn học kỳ:
+              </label>
+              <div className="semester-select-wrapper">
+                <select
+                  value={semester}
+                  onChange={(e) => setSemester(e.target.value)}
+                  className="semester-select"
+                >
+                  {availableSemesters.length > 0 ? (
+                    availableSemesters.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={semester}>{semester}</option>
+                  )}
+                </select>
+              </div>
+              <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                ({courses.length} môn học)
+              </span>
+            </div>
+          )}
 
           {error && <p style={{ color: '#ef4444', fontWeight: '600' }}>{error}</p>}
           {isLoadingCourses ? (
@@ -425,29 +615,89 @@ function AdminPage() {
               <table className="admin-table">
                 <thead>
                   <tr>
+                    <th style={{ width: '40px' }}>
+                      <input
+                        type="checkbox"
+                        checked={(() => {
+                          const currentCourses = viewMode === 'all' ? allCourses : courses;
+                          return currentCourses.length > 0 && selectedCourses.length === currentCourses.filter(c => c.id).length;
+                        })()}
+                        onChange={handleSelectAll}
+                        style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                      />
+                    </th>
                     <th>Mã môn</th>
                     <th>Tên môn</th>
                     <th>Tín chỉ</th>
                     <th>Bộ môn</th>
+                    {viewMode === 'all' && <th>Học kỳ</th>}
+                    <th style={{ width: '80px' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {courses.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="admin-table-empty">Chưa có môn học nào cho học kỳ này.</td>
-                    </tr>
-                  ) : (
-                    courses.map((course) => (
-                      <tr key={`${course.code}-${course.name}`}>
+                  {(() => {
+                    const currentCourses = viewMode === 'all' ? allCourses : courses;
+                    if (currentCourses.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={viewMode === 'all' ? 7 : 6} className="admin-table-empty">
+                            {viewMode === 'all' ? 'Chưa có môn học nào trong hệ thống.' : `Chưa có môn học nào cho học kỳ ${semester}.`}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return currentCourses.map((course) => (
+                      <tr key={course.id || `${course.code}-${course.semester}`}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedCourses.includes(course.id)}
+                            onChange={() => handleToggleSelectCourse(course.id)}
+                            style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                          />
+                        </td>
                         <td><strong>{course.code}</strong></td>
                         <td>{course.name}</td>
                         <td>{course.credits}</td>
                         <td>{course.department || '-'}</td>
+                        {viewMode === 'all' && <td>{course.semester || '-'}</td>}
+                        <td>
+                          <motion.button
+                            onClick={() => handleDeleteCourses([course.id])}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            style={{
+                              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title="Xóa môn học này"
+                          >
+                            🗑️
+                          </motion.button>
+                        </td>
                       </tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
+              {(() => {
+                const currentCourses = viewMode === 'all' ? allCourses : courses;
+                return currentCourses.length > 0 && (
+                  <p style={{ marginTop: '15px', color: '#64748b', textAlign: 'center', fontSize: '14px' }}>
+                    Tổng số môn học: <strong>{currentCourses.length}</strong>
+                    {selectedCourses.length > 0 && (
+                      <span style={{ marginLeft: '15px', color: '#ef4444' }}>
+                        Đã chọn: <strong>{selectedCourses.length}</strong>
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
           )}
         </motion.section>
@@ -579,6 +829,52 @@ function AdminPage() {
           )}
         </motion.section>
       </motion.div>
+
+      {/* Modal xác nhận xóa */}
+      {showDeleteModal && (
+        <div className="delete-modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="delete-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="delete-modal-header">
+              <h3>🗑️ Xác nhận xóa môn học</h3>
+            </div>
+            <div className="delete-modal-body">
+              <p>
+                Bạn có chắc chắn muốn xóa <strong>{coursesToDelete.length}</strong> môn học đã chọn?
+              </p>
+              <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '10px' }}>
+                ⚠️ Hành động này không thể hoàn tác!
+              </p>
+            </div>
+            <div className="delete-modal-footer">
+              <motion.button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setCoursesToDelete([]);
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="delete-modal-btn cancel-btn"
+              >
+                Huỷ
+              </motion.button>
+              <motion.button
+                onClick={confirmDeleteCourses}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="delete-modal-btn confirm-btn"
+              >
+                Xác nhận xóa
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

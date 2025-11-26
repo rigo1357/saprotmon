@@ -1,0 +1,24 @@
+code,name,credits,department
+INT1001,Giới thiệu Công nghệ Thông tin,3,Khoa CNTT
+INT2002,Cấu trúc Dữ liệu và Giải thuật,3,Khoa CNTT
+INT2201,Lập trình Hướng đối tượng,3,Khoa CNTT
+INT2202,Cơ sở Dữ liệu,3,Khoa CNTT
+INT3003,Phát triển Ứng dụng Web,3,Khoa CNTT
+INT4004,Đồ án Cơ sở ngành,3,Khoa CNTT
+INT5001,Đồ án Chuyên ngành,3,Khoa CNTT
+MAT1010,Giải tích 1,4,Khoa Toán
+MAT1020,Đại số Tuyến tính,3,Khoa Toán
+MAT2010,Toán Rời rạc,3,Khoa Toán
+MAT5002,Toán Tự động hoá,4,Khoa Toán
+ENG2001,Kỹ năng Giao tiếp,2,Khoa Ngoại ngữ
+ENG3004,Tiếng Anh Thuyết trình,2,Khoa Ngoại ngữ
+MGT4003,Quản trị Chiến lược,3,Khoa Quản trị
+MGT3001,Quản trị Dự án,3,Khoa Quản trị
+PHY1001,Vật lý Đại cương,3,Khoa Khoa học Tự nhiên
+CHEM1001,Hóa học Đại cương,3,Khoa Khoa học Tự nhiên
+BIO1001,Sinh học Đại cương,2,Khoa Khoa học Tự nhiên
+HIS2001,Lịch sử Đảng Cộng sản Việt Nam,2,Khoa Lý luận Chính trị
+PHI2001,Triết học Mác - Lênin,3,Khoa Lý luận Chính trị
+
+
+
