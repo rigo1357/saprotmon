@@ -5,7 +5,7 @@ from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
-from .models import User, Schedule, Course, ChatHistory, OTP  # Đảm bảo import cả User, Schedule, Course, ChatHistory, OTP
+from .models import User, Schedule, Course, ChatHistory, OTP
 
 # Global client để tái sử dụng
 _client = None
@@ -16,7 +16,7 @@ def load_env_file():
     env_path = Path(__file__).parent.parent / ".env"
     if env_path.exists():
         try:
-            with open(env_path, "r", encoding="utf-8-sig") as f:  # utf-8-sig để loại bỏ BOM
+            with open(env_path, "r", encoding="utf-8-sig") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
@@ -34,25 +34,22 @@ load_env_file()
 async def init_db():
     global _client
     
-    # Lấy MongoDB connection string từ biến môi trường hoặc dùng mặc định
     mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     
     print(f"Đang kết nối với MongoDB tại: {mongodb_url[:50]}...")
     
     try:
-        # Tạo client với cấu hình tối ưu cho MongoDB Atlas
         _client = AsyncIOMotorClient(
             mongodb_url,
-            serverSelectionTimeoutMS=30000,  # 30 giây timeout (tăng từ 5s)
-            connectTimeoutMS=20000,  # 20 giây để kết nối
-            socketTimeoutMS=20000,  # 20 giây cho socket operations
-            maxPoolSize=50,  # Tối đa 50 connections trong pool
-            minPoolSize=10,  # Tối thiểu 10 connections
-            retryWrites=True,  # Tự động retry writes
-            retryReads=True,  # Tự động retry reads
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=30000,
+            socketTimeoutMS=30000,
+            maxPoolSize=50,
+            minPoolSize=10,
+            retryWrites=True,
+            retryReads=True,
         )
         
-        # Kiểm tra kết nối bằng cách ping server (với retry)
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -62,7 +59,7 @@ async def init_db():
             except Exception as e:
                 if attempt < max_retries - 1:
                     print(f"⚠️ Lần thử {attempt + 1} thất bại, thử lại...")
-                    await asyncio.sleep(1)  # Đợi 1 giây trước khi retry
+                    await asyncio.sleep(1)
                 else:
                     raise
         
@@ -72,13 +69,7 @@ async def init_db():
         
         await init_beanie(
             database=database,
-            document_models=[
-                User,
-                Schedule,
-                Course,
-                ChatHistory,
-                OTP
-            ]
+            document_models=[User, Schedule, Course, ChatHistory, OTP]
         )
         print("✓ Khởi tạo Beanie hoàn tất.")
         
@@ -93,7 +84,7 @@ async def init_db():
         print("3. Kiểm tra network connection")
         print("4. Thử chạy lại: python check_mongodb.py")
         print("=" * 60)
-        raise ConnectionError("MongoDB connection failed. Vui lòng kiểm tra MongoDB đã được khởi động.")
+        raise ConnectionError("MongoDB connection failed.")
     except Exception as e:
         print(f"❌ Lỗi không xác định khi kết nối MongoDB: {e}")
         import traceback

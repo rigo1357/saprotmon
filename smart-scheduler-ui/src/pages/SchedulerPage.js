@@ -716,31 +716,6 @@ function SchedulerForm({ onGenerate }) {
             coursesError ? <p style={{ color: '#f87171' }}>{coursesError}</p> :
               filteredSubjects.length === 0 ? <p style={{ color: '#94a3b8' }}>Không tìm thấy môn học.</p> :
                 filteredSubjects.map((course) => {
-                  // Kiểm tra xem môn này đã được chọn chưa (so sánh theo originalCode)
-                  const courseOriginalCode = course.metadata?.original_code ||
-                    (course.code.includes('-G') ? course.code.split('-G')[0] : course.code);
-                  const selected = selectedOriginalCodes.includes(courseOriginalCode) || 
-                                   selectedSubjects.some(s => s.code === course.code);
-                  return (
-                    <label key={course.code} className={`subject-item ${selected ? 'selected' : 'default'}`}>
-                      <div>
-                        <strong>{course.code}</strong> - {course.name}
-                        <div style={{ color: '#94a3b8', fontSize: '13px' }}>{course.credits || 0} tín chỉ</div>
-                      </div>
-                      {selectedTab === 'current' ? (
-                        <input type="checkbox" checked={selected} onChange={() => handleSubjectToggle(course)} />
-                      ) : <span style={{ color: '#94a3b8', fontSize: '12px' }}>Đang xem</span>}
-                    </label>
-                  );
-                })}
-        </div>
-        <div style={{ border: '2px solid #e2e8f0', borderRadius: '16px', padding: '20px', backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-          <h4 style={{ marginTop: 0, color: '#0c4a6e', fontSize: '1.1rem', fontWeight: 700 }}>Môn đã chọn ({selectedSubjects.length})</h4>
-          {selectedSubjects.length === 0 ? <p style={{ color: '#64748b', marginTop: '16px' }}>Chưa chọn môn nào.</p> :
-            selectedSubjects.map((subject, index) => (
-              <div key={subject.code} style={{ padding: '12px 0', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong style={{ color: '#1e293b' }}>{subject.name}</strong>
                   <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
                     {subject.credits} TC • Ưu tiên {calculatePriority(subject, index)}/10
                   </div>

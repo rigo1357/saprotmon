@@ -404,20 +404,14 @@ async def handle_chat(
         # Trả về message lỗi thân thiện thay vì raise HTTPException
         error_message = "Xin lỗi, tôi đang gặp sự cố khi xử lý yêu cầu của bạn. Vui lòng thử lại sau."
         
-        # Kiểm tra loại lỗi cụ thể từ exception message
+        # Kiểm tra loại lỗi cụ thể
         error_str = str(e).lower()
-        error_type = type(e).__name__.lower()
-        
-        # Kiểm tra các loại lỗi kết nối
-        if any(keyword in error_str for keyword in ["connection", "refused", "connect", "cannot connect", "không thể kết nối"]):
-            error_message = "Xin lỗi, tôi không thể kết nối với mô hình AI. Vui lòng kiểm tra Ollama đã được khởi động chưa (chạy 'ollama serve' trong terminal)."
-        elif "timeout" in error_str or "timed out" in error_str:
+        if "connection" in error_str or "refused" in error_str or "connect" in error_str:
+            error_message = "Xin lỗi, tôi không thể kết nối với Ollama. Vui lòng kiểm tra Ollama đã được khởi động chưa (chạy 'ollama serve' trong terminal)."
+        elif "timeout" in error_str:
             error_message = "Xin lỗi, yêu cầu đã hết thời gian chờ. Vui lòng thử lại."
-        elif any(keyword in error_str for keyword in ["model", "not found", "chưa được tải"]):
+        elif "model" in error_str or "not found" in error_str:
             error_message = "Xin lỗi, mô hình AI chưa được tải. Vui lòng chạy 'ollama pull gemma2:2b' trong terminal."
-        elif "ollama" in error_str:
-            # Nếu exception message đã chứa thông tin về Ollama, sử dụng nó
-            error_message = str(e)
         
         # Lưu message lỗi vào database (nếu có thể)
         try:
@@ -428,10 +422,9 @@ async def handle_chat(
                 role="assistant"
             )
             await bot_message.save()
-        except Exception as save_error:
-            print(f"Lỗi khi lưu message lỗi: {save_error}")
+        except:
+            pass
         
-        # Luôn trả về response với status 200 để frontend không coi là lỗi network
         return {"reply": error_message, "session_id": session_id}
 
 @app.get("/api/chat/history", response_model=List[ChatHistoryResponse])
