@@ -309,23 +309,23 @@ function SectionDivider({ title }) {
   return (
     <div className="section-divider" style={{ margin: '40px 0 24px', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ 
-          height: '3px', 
-          flex: 1, 
+        <div style={{
+          height: '3px',
+          flex: 1,
           background: 'linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.3), transparent)',
           borderRadius: '2px'
         }}></div>
-        <h3 style={{ 
-          fontSize: '1.5rem', 
+        <h3 style={{
+          fontSize: '1.5rem',
           fontWeight: 700,
           margin: 0,
           color: '#0c4a6e',
           letterSpacing: '-0.02em',
           whiteSpace: 'nowrap'
         }}>{title}</h3>
-        <div style={{ 
-          height: '3px', 
-          flex: 1, 
+        <div style={{
+          height: '3px',
+          flex: 1,
           background: 'linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.3), transparent)',
           borderRadius: '2px'
         }}></div>
@@ -371,15 +371,15 @@ function SchedulerForm({ onGenerate }) {
           api.get('/api/metadata/semesters'),
           api.get('/api/metadata/majors')
         ]);
-        
+
         const semesters = semRes.data?.semesters || [];
         const majors = majRes.data?.majors || [];
-        
+
         console.log('Đã tải metadata:', { semesters, majors });
-        
+
         setAvailableSemesters(semesters);
         setAvailableMajors(majors);
-        
+
         if (semesters.length === 0) {
           console.warn('⚠️ Không có dữ liệu học kỳ trong database. Hãy chạy script add_sample_courses.py để thêm dữ liệu mẫu.');
         }
@@ -557,7 +557,7 @@ function SchedulerForm({ onGenerate }) {
     const code = s.code.includes('-G') ? s.code.split('-G')[0] : s.code;
     return code;
   });
-  
+
   const filteredSubjects = availableSubjects.filter(c => {
     if (!searchText) return true;
     return `${c.code} ${c.name}`.toLowerCase().includes(searchText.toLowerCase());
@@ -670,7 +670,7 @@ function SchedulerForm({ onGenerate }) {
             value={studyInfo.minCredits}
           />
         </div>
-      </div>
+      </div >
 
       <SectionDivider title="Thời gian rảnh" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '16px' }}>
@@ -716,6 +716,80 @@ function SchedulerForm({ onGenerate }) {
             coursesError ? <p style={{ color: '#f87171' }}>{coursesError}</p> :
               filteredSubjects.length === 0 ? <p style={{ color: '#94a3b8' }}>Không tìm thấy môn học.</p> :
                 filteredSubjects.map((course) => {
+                  // Kiểm tra xem môn này đã được chọn chưa (so sánh theo originalCode)
+                  const courseOriginalCode = course.metadata?.original_code ||
+                    (course.code.includes('-G') ? course.code.split('-G')[0] : course.code);
+                  const selected = selectedOriginalCodes.includes(courseOriginalCode) ||
+                    selectedSubjects.some(s => s.code === course.code);
+                  return (
+                    <label key={course.code} className={`subject-item-modern ${selected ? 'selected' : 'default'}`}>
+                      <div className="subject-info">
+                        <div className="subject-code-badge">{course.code}</div>
+                        <div className="subject-details">
+                          <strong className="subject-name">{course.name}</strong>
+                          <div className="subject-meta">
+                            <span className="credit-badge">📚 {course.credits || 0} TC</span>
+                            {course.department && <span className="dept-badge">🏛️ {course.department}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      {selectedTab === 'current' ? (
+                        <input type="checkbox" checked={selected} onChange={() => handleSubjectToggle(course)} className="custom-checkbox" />
+                      ) : <span className="viewing-badge">👁️ Đang xem</span>}
+                    </label>
+                  );
+                })}
+        </div>
+        <div style={{ border: '2px solid #e2e8f0', borderRadius: '16px', padding: '20px', backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+          <h4 style={{ marginTop: 0, color: '#0c4a6e', fontSize: '1.1rem', fontWeight: 700 }}>Môn đã chọn ({selectedSubjects.length})</h4>
+          {(() => {
+            const totalCredits = selectedSubjects.reduce((sum, s) => sum + (s.credits || 0), 0);
+            const minCredits = studyInfo.minCredits || 0;
+            const maxCredits = studyInfo.maxCredits || 0;
+            const percentage = minCredits > 0 ? Math.min((totalCredits / minCredits) * 100, 100) : 0;
+            const isLow = totalCredits < minCredits;
+            const isHigh = maxCredits > 0 && totalCredits > maxCredits;
+
+            return (
+              <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: isLow ? '#fef2f2' : isHigh ? '#fefce8' : '#f0f9ff', borderRadius: '8px', border: `1px solid ${isLow ? '#fecaca' : isHigh ? '#fef08a' : '#bae6fd'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: isLow ? '#991b1b' : isHigh ? '#854d0e' : '#075985' }}>
+                    Tổng tín chỉ: {totalCredits} TC
+                  </span>
+                  {minCredits > 0 && (
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      Tối thiểu: {minCredits} TC {maxCredits > 0 && `• Tối đa: ${maxCredits} TC`}
+                    </span>
+                  )}
+                </div>
+                {minCredits > 0 && (
+                  <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${percentage}%`,
+                      height: '100%',
+                      backgroundColor: isLow ? '#f87171' : isHigh ? '#fbbf24' : '#22d3ee',
+                      transition: 'width 0.3s ease, background-color 0.3s ease'
+                    }} />
+                  </div>
+                )}
+                {isLow && minCredits > 0 && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    ⚠️ Chưa đủ tín chỉ tối thiểu (thiếu {minCredits - totalCredits} TC)
+                  </div>
+                )}
+                {isHigh && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#ca8a04', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    ⚠️ Vượt quá tín chỉ tối đa ({totalCredits - maxCredits} TC)
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {selectedSubjects.length === 0 ? <p style={{ color: '#64748b', marginTop: '16px' }}>Chưa chọn môn nào.</p> :
+            selectedSubjects.map((subject, index) => (
+              <div key={subject.code} style={{ padding: '12px 0', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong style={{ color: '#1e293b' }}>{subject.name}</strong>
                   <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
                     {subject.credits} TC • Ưu tiên {calculatePriority(subject, index)}/10
                   </div>
@@ -745,7 +819,7 @@ function SchedulerForm({ onGenerate }) {
           Tạo thời khóa biểu
         </button>
       </div>
-    </div>
+    </div >
   );
 }
 
@@ -809,13 +883,17 @@ function Scheduler() {
   const [schedule, setSchedule] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [conflicts, setConflicts] = useState([]);
+  const [generationContext, setGenerationContext] = useState(null);
 
   const handleGenerate = async (formData) => {
     setIsLoading(true);
+    setGenerationContext({
+      studyInfo: formData.studyInfo,
+      subjects: formData.subjects
+    });
+
     try {
-      // ... Logic giữ nguyên như cũ ...
       const payloadSubjects = formData.subjects.map((subject) => ({
-        // (Em rút gọn đoạn này để đỡ dài, logic mapping giữ nguyên nhé)
         ...subject, is_retake: subject.is_retake || false,
       }));
       const response = await api.post('/api/schedule', {
@@ -855,6 +933,41 @@ function Scheduler() {
               <button onClick={() => exportToExcel(schedule.schedule, 'Thoi_khoa_bieu')} className="btn-rounded btn-cyan">📊 Excel</button>
             </div>
           </div>
+
+          {/* Cảnh báo tín chỉ tối thiểu */}
+          {(() => {
+            if (!generationContext) return null;
+            const { studyInfo, subjects } = generationContext;
+            const scheduledSubjects = subjects.filter(s => !conflicts.some(c => c.subject === s.name));
+            const totalCredits = scheduledSubjects.reduce((sum, s) => sum + (s.credits || 0), 0);
+            const minCredits = studyInfo.minCredits || 0;
+
+            if (minCredits > 0 && totalCredits < minCredits) {
+              return (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '12px 16px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#b91c1c',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '20px' }}>⚠️</span>
+                  <div>
+                    <strong>Cảnh báo: Không đủ tín chỉ tối thiểu!</strong>
+                    <div style={{ fontSize: '14px', marginTop: '2px' }}>
+                      Thời khóa biểu này chỉ có <strong>{totalCredits}</strong> tín chỉ (Yêu cầu tối thiểu: <strong>{minCredits}</strong> tín chỉ).
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <ScheduleTable schedule={schedule} />
         </div>
       )}
@@ -865,7 +978,7 @@ function Scheduler() {
 function SchedulerPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('scheduler'); // 'scheduler' hoặc 'chatbot'
+  const [activeTab, setActiveTab] = useState('scheduler');
 
   return (
     <div className="scheduler-page-container">
@@ -901,7 +1014,6 @@ function SchedulerPage() {
         </div>
       </motion.header>
 
-      {/* Tabs để chuyển đổi giữa Scheduler và Chatbot */}
       <div className="page-tabs">
         <button
           onClick={() => setActiveTab('scheduler')}
@@ -917,7 +1029,6 @@ function SchedulerPage() {
         </button>
       </div>
 
-      {/* Hiển thị nội dung theo tab đã chọn */}
       {activeTab === 'scheduler' ? <Scheduler /> : <ChatbotPage />}
     </div>
   );
